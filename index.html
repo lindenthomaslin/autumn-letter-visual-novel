@@ -1,0 +1,1565 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#e9e7f0">
+  <title>晚风借我一封信｜校园视觉小说</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #394052;
+      --muted: #73788a;
+      --rose: #b97687;
+      --paper: rgba(255, 253, 250, .84);
+      --edge: rgba(255, 255, 255, .72);
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body {
+      color: var(--ink);
+      background: #d9d8e6;
+      font-family: "Arial Rounded MT Bold", "Hiragino Maru Gothic ProN", "Yu Gothic", "Microsoft YaHei", system-ui, sans-serif;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button { font: inherit; color: inherit; touch-action:manipulation; }
+    #game {
+      position: relative; width: 100vw; height:100vh; height:100dvh; min-height:480px; overflow:hidden;
+      isolation: isolate; background: #e6dfeb; touch-action:manipulation;
+    }
+    #game:not(.playing) .dialogue-wrap, #game:not(.playing) .progress-track,
+    #game:not(.playing) .chapter-tag, #game:not(.playing) .nameplate {
+      visibility:hidden; opacity:0; pointer-events:none;
+    }
+    #backdrop {
+      position: absolute; inset: 0; z-index: -3; width: 100%; height: 100%; object-fit: cover;
+      transition: opacity .8s ease, filter 1s ease; opacity: 1;
+      animation: background-drift 32s ease-in-out infinite alternate;
+    }
+    #backdrop[data-scene="rain"] { filter:saturate(.84) brightness(.87) contrast(.98); }
+    #backdrop[data-scene="winter"] { filter:saturate(.76) hue-rotate(7deg) brightness(1.03); }
+    #backdrop[data-scene="hospital"] { filter:saturate(.74) brightness(1.04); }
+    @keyframes background-drift { from { transform: scale(1.015) translate3d(0,0,0); } to { transform: scale(1.075) translate3d(-.7%,.4%,0); } }
+    #wash {
+      position: absolute; inset: 0; z-index: -2; pointer-events: none;
+      background: linear-gradient(180deg, rgba(255,255,255,.03) 30%, rgba(42,48,71,.1) 68%, rgba(35,40,59,.24));
+      transition: background .8s ease;
+    }
+    #wash[data-scene="rain"] { background: linear-gradient(180deg,rgba(101,124,151,.06),rgba(70,83,109,.13) 55%,rgba(35,42,61,.48)); }
+    #wash[data-scene="hospital"] { background: linear-gradient(180deg,rgba(235,232,220,.03),rgba(71,79,94,.08) 57%,rgba(36,44,58,.39)); }
+    #wash[data-scene="station"] { background: linear-gradient(180deg,rgba(80,77,116,.12),rgba(55,59,84,.08) 55%,rgba(31,37,57,.48)); }
+    #ambience { position:absolute; inset:0; z-index:-1; overflow:hidden; pointer-events:none; }
+    #fx-canvas { position:absolute; inset:0; width:100%; height:100%; }
+    .grain {
+      position: absolute; inset: 0; z-index: 4; pointer-events: none; opacity: .12;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.2'/%3E%3C/svg%3E");
+      mix-blend-mode: soft-light;
+    }
+    .topbar {
+      position: absolute; z-index: 10; top: max(18px, env(safe-area-inset-top)); left: 0; right: 0;
+      display: flex; justify-content: space-between; align-items: center; padding: 0 clamp(18px, 4vw, 58px);
+      pointer-events: none;
+    }
+    .brand, .top-controls { pointer-events: auto; }
+    .brand { display: flex; align-items: center; gap: 10px; color: rgba(57,64,82,.8); letter-spacing: .1em; font-size: 12px; }
+    .brand-mark { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 50%; background: rgba(255,255,255,.55); box-shadow: 0 3px 14px #5a52701c; color: var(--rose); font-size: 15px; }
+    .top-controls { display: flex; gap: 8px; }
+    .icon-btn {
+      display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid rgba(255,255,255,.64);
+      border-radius: 50%; background: rgba(255,255,255,.56); backdrop-filter: blur(12px);
+      box-shadow: 0 4px 16px rgba(67,61,84,.08); cursor: pointer; transition: .2s ease;
+    }
+    .icon-btn:hover { background: rgba(255,255,255,.9); transform: translateY(-1px); }
+    .icon-btn.active { color: #aa6579; background: rgba(255,247,248,.86); }
+    .chapter-tag {
+      position: absolute; z-index: 5; top: 82px; left: 50%; transform: translateX(-50%);
+      color: rgba(255,255,255,.88); text-shadow: 0 1px 12px #393a58a6;
+      font-size: clamp(11px, 1.1vw, 14px); letter-spacing: .2em; white-space: nowrap;
+      opacity: 0; transition: opacity .5s;
+    }
+    .chapter-tag.show { opacity: 1; }
+    #portrait-stage {
+      position:absolute; z-index:-1; bottom:17vh; width:min(43vw,610px); height:min(76vh,820px);
+      transform:translate3d(var(--physics-x,0px),var(--physics-y,0px),0) rotate(var(--physics-tilt,0deg));
+      transform-origin:bottom center; transition:filter .5s ease; pointer-events:none; will-change:transform;
+    }
+    #portrait-stage.left { left:max(2vw,calc((100vw - 1400px)/2)); }
+    #portrait-stage.right { right:max(2vw,calc((100vw - 1400px)/2)); }
+    #portrait-stage.center { left:50%; margin-left:calc(min(43vw,610px) / -2); }
+    #portrait-body {
+      position:relative; width:100%; height:100%; opacity:0; transform:translateY(16px) scale(.985);
+      transform-origin:bottom center; transition:opacity .45s ease,transform .6s cubic-bezier(.2,.75,.2,1),rotate .5s ease;
+      pointer-events:auto; touch-action:manipulation;
+    }
+    #portrait { display:block; width:100%; height:100%; object-fit:contain; object-position:bottom center;
+      filter:drop-shadow(0 10px 24px rgba(43,42,64,.18)); transition:filter .5s ease;
+      pointer-events:auto; cursor:pointer; -webkit-user-drag:none; user-select:none; }
+    #portrait-stage.visible #portrait-body { opacity:1; transform:translateY(0) scale(1); animation:portrait-breathe 5.2s ease-in-out .4s infinite alternate; }
+    #portrait.low { filter: drop-shadow(0 10px 24px rgba(43,42,64,.14)) saturate(.82); }
+    #portrait.tears { filter: drop-shadow(0 10px 24px rgba(43,42,64,.18)) saturate(.72) brightness(.98); }
+    #portrait-stage.shy #portrait-body { rotate:-1.2deg; }
+    #portrait-stage.low #portrait-body, #portrait-stage.tears #portrait-body { rotate:1deg; }
+    @keyframes portrait-breathe { 0% { translate:0 0; } 100% { translate:0 -4px; } }
+    #portrait-stage.enter #portrait-body { animation:portrait-enter .62s cubic-bezier(.18,.82,.22,1) both,portrait-breathe 5.2s ease-in-out .7s infinite alternate; }
+    #portrait-stage.speaking #portrait-body { animation:speaking-bob .38s ease-in-out 2; }
+    #portrait-stage.reacting #portrait-body { animation:portrait-react .52s cubic-bezier(.2,.8,.2,1); }
+    #portrait-stage.enter.speaking #portrait-body { animation:portrait-enter .62s cubic-bezier(.18,.82,.22,1) both,portrait-breathe 5.2s ease-in-out .7s infinite alternate; }
+    @keyframes portrait-enter { from { opacity:0; transform:translateY(34px) scale(.94); } to { opacity:1; transform:translateY(0) scale(1); } }
+    @keyframes speaking-bob { 0%,100% { translate:0 0; } 50% { translate:0 -2px; } }
+    @keyframes portrait-react { 0% { transform:translateY(0) scale(1); } 28% { transform:translateY(-7px) scale(1.018); } 62% { transform:translateY(1px) scale(.995); } 100% { transform:translateY(0) scale(1); } }
+    #face-effects { position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
+    #face-blush { opacity:0; transition:opacity .42s ease; }
+    #portrait-stage.shy #face-blush { opacity:.9; animation:blush-pulse 2s ease-in-out infinite alternate; }
+    #portrait-stage.blush-extra #face-blush { opacity:1; animation:blush-pulse .8s ease-in-out 2 alternate; }
+    @keyframes blush-pulse { from { opacity:.63; } to { opacity:1; } }
+    #face-hearts { opacity:0; }
+    #portrait-stage.shy #face-hearts, #portrait-stage.blush-extra #face-hearts { animation:heart-rise 1.8s ease-in-out infinite; }
+    @keyframes heart-rise { 0% { opacity:0; translate:0 18px; scale:.65; } 25% { opacity:.88; } 80% { opacity:.52; } 100% { opacity:0; translate:5px -43px; scale:1.1; } }
+    #face-breath { opacity:0; }
+    #portrait-stage.exhaling #face-breath { animation:face-exhale 1.45s ease-out both; }
+    @keyframes face-exhale { 0% { opacity:0; translate:0 8px; scale:.7; } 22% { opacity:.78; } 100% { opacity:0; translate:70px -58px; scale:1.45; } }
+    #face-tears { opacity:0; }
+    #portrait-stage.tears #face-tears { opacity:.9; animation:tear-slide 2.5s ease-in infinite; }
+    @keyframes tear-slide { 0% { opacity:.15; translate:0 -9px; } 35% { opacity:.9; } 100% { opacity:0; translate:0 24px; } }
+    .nameplate {
+      position: absolute; z-index: 7; bottom: calc(26vh + 23px); left: clamp(22px, 7vw, 110px);
+      padding: 7px 15px 8px; border: 1px solid rgba(255,255,255,.7); border-radius: 18px;
+      background: rgba(255,251,249,.77); backdrop-filter: blur(12px); box-shadow: 0 5px 22px #32334a20;
+      font-size: 13px; letter-spacing: .08em; opacity: 0; transform: translateY(6px); transition: .3s;
+    }
+    .nameplate.visible { opacity: 1; transform: translateY(0); }
+    .nameplate::before { content: "✦"; margin-right: 7px; color: #bd8493; }
+    .dialogue-wrap {
+      position: absolute; z-index: 8; left: 0; right: 0; bottom: 0; padding: 0 clamp(12px, 4vw, 58px) max(15px, env(safe-area-inset-bottom));
+    }
+    .dialogue {
+      position: relative; width: min(1120px, 100%); min-height: 186px; margin: auto;
+      padding: 24px clamp(23px, 4.2vw, 54px) 28px;
+      border: 1px solid var(--edge); border-radius: 23px;
+      background: var(--paper); backdrop-filter: blur(22px) saturate(1.2);
+      box-shadow: 0 18px 65px rgba(53,48,74,.17), inset 0 1px 0 rgba(255,255,255,.82);
+      cursor: pointer; transition: background .7s, border-color .7s;
+    }
+    .dialogue::before {
+      content: ""; position: absolute; left: 28px; right: 28px; top: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, #fff, transparent);
+    }
+    .dialogue-head { display: flex; justify-content: space-between; align-items: center; min-height: 22px; margin-bottom: 8px; }
+    #speaker { color: #ad7180; font-size: 14px; letter-spacing: .13em; font-weight: 700; }
+    #scene-label { color: #9395a1; font-size: 11px; letter-spacing: .1em; }
+    #text {
+      min-height: 66px; color: #424758; font-size: clamp(15px, 1.55vw, 19px); line-height: 1.95;
+      letter-spacing: .035em; white-space: pre-wrap; text-wrap: pretty;
+    }
+    .dialogue-foot { position: absolute; right: 29px; bottom: 15px; display: flex; align-items: center; gap: 15px; color: #9a9aa4; font-size: 10px; letter-spacing: .08em; }
+    .next-hint { display: flex; align-items: center; gap: 7px; opacity: .8; }
+    .next-arrow { color: #b87788; font-size: 15px; animation: bob 1.2s ease-in-out infinite; }
+    @keyframes bob { 50% { transform: translateY(3px); } }
+    .progress-track { position: absolute; left: 50%; bottom: max(5px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(1120px, calc(100% - 2 * clamp(12px, 4vw, 58px))); height: 2px; background: #ffffff69; border-radius: 3px; overflow: hidden; z-index: 9; }
+    #progress { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#d6a1ab,#f1d4c0); transition: width .25s ease; }
+    .choices {
+      position: absolute; z-index: 12; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 13px;
+      background: rgba(51,51,70,.18); backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity .35s;
+    }
+    .choices.visible { opacity: 1; pointer-events: auto; }
+    .choice-title { margin-bottom: 12px; color: white; text-shadow: 0 2px 14px #393954a8; letter-spacing: .2em; font-size: clamp(13px, 1.5vw, 17px); }
+    .choice {
+      width: min(560px, calc(100vw - 42px)); padding: 17px 22px; border: 1px solid #ffffffbd; border-radius: 14px;
+      background: rgba(255,253,250,.88); box-shadow: 0 8px 26px #34334e29; cursor: pointer; text-align: center;
+      letter-spacing: .04em; font-size: 15px; transition: .2s;
+    }
+    .choice:hover { transform: translateY(-2px); background: #fff; border-color: #d8a2ad; color: #a86477; }
+    .endcard {
+      position: absolute; z-index: 13; inset: 0; display: grid; place-items: center; padding: 24px;
+      background: rgba(45,48,67,.34); backdrop-filter: blur(7px); opacity: 0; pointer-events: none; transition: opacity .6s;
+    }
+    .endcard.visible { opacity: 1; pointer-events: auto; }
+    .end-inner {
+      width: min(560px, 100%); padding: 44px 36px 35px; border-radius: 24px; text-align: center;
+      background: rgba(255,252,249,.91); border: 1px solid #ffffffdb; box-shadow: 0 20px 70px #292b454a;
+      animation: rise .6s both;
+    }
+    @keyframes rise { from { transform: translateY(12px); opacity: .4; } to { transform: translateY(0); opacity: 1; } }
+    .end-mark { color: #bd8493; font-size: 19px; }
+    #end-title { margin: 13px 0 10px; font-size: 21px; font-weight: 500; letter-spacing: .12em; }
+    #end-copy { margin: 0 auto 26px; max-width: 370px; color: #777b8c; font-size: 14px; line-height: 1.9; }
+    .end-button { padding: 11px 28px; border: 0; border-radius: 22px; background: #b87888; color: white; cursor: pointer; box-shadow: 0 5px 14px #b878883c; }
+    .end-button:hover { background: #a9687a; }
+    .start-screen {
+      position: absolute; z-index: 20; inset: 0; display: grid; place-items: center; padding: 24px;
+      background: linear-gradient(180deg,rgba(42,48,69,.16),rgba(46,45,64,.42)); backdrop-filter: blur(2px); transition: opacity .8s;
+    }
+    .start-screen.hidden { opacity: 0; pointer-events: none; }
+    .start-card { width:min(590px,100%); max-height:calc(100dvh - 40px); overflow:auto; padding:42px 38px 30px; border:1px solid #ffffffc4; border-radius:28px; text-align:center; background:rgba(255,252,248,.86); box-shadow:0 20px 80px #33334e45; backdrop-filter:blur(20px); }
+    .start-overline { color: #a77b88; font-size: 11px; letter-spacing: .3em; }
+    h1 { margin: 15px 0 9px; font-family: "STSong", "Songti SC", "Noto Serif CJK SC", serif; font-size: clamp(27px,4vw,39px); font-weight: 500; letter-spacing: .12em; }
+    .start-sub { color: #7d7f8d; font-family: "STSong", "Songti SC", serif; font-size: 15px; letter-spacing: .1em; }
+    .start-ornament { width: 48px; height: 1px; margin: 24px auto; background: #d4abb0; }
+    .start-description { max-width: 420px; margin: auto; color: #747887; font-size: 13px; line-height: 2; }
+    .menu-view { display:none; }
+    .menu-view.active { display:block; animation:menu-enter .3s ease both; }
+    @keyframes menu-enter { from { opacity:0; transform:translateY(7px); } to { opacity:1; transform:translateY(0); } }
+    .menu-nav { display:grid; gap:9px; width:min(340px,100%); margin:23px auto 0; }
+    .start-button { display:block; width:100%; min-width:184px; margin:0 auto; padding:14px 25px; border:0; border-radius:24px; color:white; background:#b97989; box-shadow:0 7px 20px #b9798944; cursor:pointer; letter-spacing:.12em; transition:.2s; }
+    .start-button:hover { transform:translateY(-2px); background:#a9697b; }
+    .menu-secondary { width:100%; padding:11px 20px; border:1px solid #ddcbd0; border-radius:22px; background:#fffaf8a8; color:#656b7a; cursor:pointer; letter-spacing:.08em; transition:.2s; }
+    .menu-secondary:hover,.menu-back:hover { background:#fff; color:#a86477; border-color:#d8a2ad; }
+    .start-note { margin-top:17px; color:#a0a0aa; font-size:10px; letter-spacing:.06em; line-height:1.8; }
+    .menu-credit { margin-top:19px; color:#9a8790; font-size:10px; letter-spacing:.18em; }
+    .menu-back { display:inline-flex; align-items:center; gap:6px; margin:0 0 19px; padding:7px 12px; border:1px solid transparent; border-radius:18px; background:transparent; color:#777887; cursor:pointer; transition:.2s; }
+    .panel-title { margin:0 0 15px; font:500 23px/1.5 "STSong","Songti SC",serif; letter-spacing:.12em; color:#45495a; }
+    .panel-copy { max-width:410px; margin:0 auto 19px; color:#727687; font-size:13px; line-height:2; }
+    .about-mark { margin:20px 0 9px; color:#a77b88; font-size:13px; letter-spacing:.2em; }
+    .official-link { display:inline-flex; align-items:center; justify-content:center; min-height:42px; padding:0 21px; border:1px solid #d6aab3; border-radius:23px; color:#a86477; background:#fffaf8; text-decoration:none; font-size:13px; letter-spacing:.06em; transition:.2s; }
+    .official-link:hover { color:white; background:#b97989; }
+    .settings-list { max-width:420px; margin:0 auto; text-align:left; }
+    .setting-row { display:flex; justify-content:space-between; align-items:center; gap:15px; padding:14px 2px; border-bottom:1px solid #ebe3e2; color:#515667; font-size:13px; }
+    .setting-description { display:block; margin-top:3px; color:#9697a1; font-size:10px; }
+    .setting-switch { flex:none; appearance:none; width:46px; height:26px; margin:0; padding:3px; border:0; border-radius:16px; background:#d8d7de; cursor:pointer; transition:background .2s; }
+    .setting-switch::before { content:""; display:block; width:20px; height:20px; border-radius:50%; background:white; box-shadow:0 2px 6px #38344a20; transition:transform .2s; }
+    .setting-switch:checked { background:#c58596; }
+    .setting-switch:checked::before { transform:translateX(20px); }
+    .setting-switch:focus-visible,.setting-range:focus-visible,.menu-secondary:focus-visible,.start-button:focus-visible { outline:3px solid #d9a8b4; outline-offset:3px; }
+    .range-wrap { display:grid; justify-items:end; gap:3px; }
+    .setting-range { width:150px; max-width:36vw; accent-color:#b97989; }
+    .range-label { color:#9997a2; font-size:10px; }
+    .log-panel {
+      position: absolute; z-index: 15; inset: 0 0 0 auto; width: min(430px, 92vw); padding: 28px 24px;
+      background: rgba(255,253,250,.94); box-shadow: -12px 0 50px #292a4325; backdrop-filter: blur(20px);
+      transform: translateX(105%); transition: transform .35s; display: flex; flex-direction: column;
+    }
+    .log-panel.visible { transform: translateX(0); }
+    .log-head { display:flex; justify-content:space-between; align-items:center; padding-bottom: 16px; border-bottom: 1px solid #e9e4e2; }
+    .log-head h2 { margin: 0; font-size: 16px; font-weight: 500; letter-spacing: .14em; }
+    .log-close { border: 0; background: transparent; color: #8b8994; font-size: 24px; cursor: pointer; }
+    #log-list { overflow: auto; padding: 8px 2px; }
+    .log-item { margin: 12px 0; padding: 10px 12px; border-radius: 9px; background: #f5f1ef; font-size: 12px; line-height: 1.8; }
+    .log-item b { display:block; color: #ad7180; font-weight: 500; margin-bottom: 2px; }
+    .log-item .inner { color: #545867; }
+    .toast { position: absolute; z-index: 14; left: 50%; top: 70px; transform: translate(-50%,-8px); opacity: 0; pointer-events: none; padding: 8px 15px; border-radius: 18px; color: #fff; background: #4a4a608c; backdrop-filter: blur(8px); font-size: 11px; transition: .25s; }
+    .toast.visible { transform: translate(-50%,0); opacity: 1; }
+    .mobile-hint { display:none; }
+    .orientation-guide { display:none; }
+    @media (max-width: 700px) {
+      .topbar { top: max(11px,env(safe-area-inset-top)); padding: 0 14px; }
+      .brand { font-size: 10px; gap: 7px; }
+      .brand-mark { width: 27px; height: 27px; }
+      .icon-btn { width: 44px; height: 44px; }
+      .chapter-tag { top: 67px; }
+      #portrait-stage { width:min(78vw,450px); height:min(68vh,650px); bottom:24vh; }
+      #portrait-stage.left { left:-8vw; }
+      #portrait-stage.right { right:-8vw; }
+      #portrait-stage.center { margin-left:calc(min(78vw,450px) / -2); }
+      .nameplate { bottom: calc(31vh + 18px); left: 24px; }
+      .dialogue-wrap { padding: 0 10px max(13px,env(safe-area-inset-bottom)); }
+      .dialogue { min-height: 174px; border-radius: 19px; padding: 20px 19px 27px; }
+      .dialogue-foot { right: 18px; bottom: 12px; }
+      #text { min-height: 69px; font-size: 15px; line-height: 1.85; }
+      #scene-label { max-width: 45%; text-align: right; }
+      .progress-track { width: calc(100% - 20px); }
+      .start-screen { padding:16px; }
+      .start-card { padding:31px 22px 25px; border-radius:23px; }
+      .mobile-hint { display:inline; }
+      .desktop-hint { display:none; }
+    }
+    @media (max-width: 700px) and (max-height: 720px) {
+      #portrait-stage { height:61vh; bottom:25vh; }
+      .dialogue { min-height:154px; padding:16px 17px 26px; }
+      #text { min-height:55px; font-size:14px; line-height:1.72; }
+      .dialogue-foot { bottom:9px; }
+    }
+    @media (max-width: 390px) {
+      .brand { letter-spacing:.04em; }
+      .brand-mark { width:24px; height:24px; }
+      .top-controls { gap:5px; }
+      .icon-btn { width:42px; height:42px; }
+      .dialogue-head { margin-bottom:4px; }
+      #speaker { font-size:13px; }
+      .start-card { padding:29px 18px 22px; }
+    }
+    @media (max-height: 560px) and (orientation: landscape) {
+      #portrait-stage { width:min(36vw,390px); height:65vh; bottom:22vh; }
+      #portrait-stage.center { margin-left:calc(min(36vw,390px) / -2); }
+      .chapter-tag { top:58px; }
+      .dialogue { min-height:130px; padding:13px 28px 24px; }
+      #text { min-height:44px; font-size:14px; line-height:1.6; }
+    }
+    @media (max-width: 960px) and (orientation: landscape) {
+      #game { min-height:0; height:100vh; height:100dvh; }
+      .topbar { top:max(8px,env(safe-area-inset-top)); padding:0 18px; }
+      .icon-btn { width:39px; height:39px; }
+      #portrait-stage { width:min(39vw,350px); height:79vh; bottom:20vh; }
+      #portrait-stage.left { left:2vw; }
+      #portrait-stage.right { right:2vw; }
+      #portrait-stage.center { margin-left:calc(min(39vw,350px) / -2); }
+      .chapter-tag { top:55px; }
+      .nameplate { left:22px; bottom:calc(20vh + 7px); }
+      .dialogue-wrap { padding:0 18px max(8px,env(safe-area-inset-bottom)); }
+      .dialogue { min-height:128px; padding:12px 26px 23px; border-radius:18px; }
+      .dialogue-head { min-height:18px; margin-bottom:3px; }
+      #text { min-height:48px; font-size:14px; line-height:1.62; }
+      .dialogue-foot { right:22px; bottom:8px; }
+      .progress-track { bottom:max(3px,env(safe-area-inset-bottom)); }
+      .start-screen { padding:8px; }
+      .start-card { max-height:calc(100dvh - 16px); padding:17px 26px 14px; }
+      .start-ornament { margin:12px auto; }
+      .start-description { line-height:1.7; }
+      .menu-nav { grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; margin-top:13px; }
+      .start-button { grid-column:1 / -1; padding:11px 20px; }
+      .menu-secondary { padding:9px 14px; }
+      .menu-credit { margin-top:11px; }
+      .start-note { margin-top:9px; }
+      .orientation-guide { display:none !important; }
+    }
+    @media (max-width: 960px) and (orientation: portrait) {
+      .orientation-guide {
+        position:fixed; z-index:100; inset:0; display:grid; place-items:center; padding:28px;
+        color:#4b4e61; text-align:center;
+        background:radial-gradient(ellipse at 50% 34%,rgba(255,255,255,.96),rgba(244,237,239,.97) 58%,rgba(222,222,235,.99));
+      }
+      .orientation-inner { width:min(330px,100%); }
+      .orientation-phone {
+        width:68px; height:112px; margin:0 auto 26px; position:relative;
+        border:3px solid #b97989; border-radius:15px; box-shadow:0 10px 26px #8b6d7b24;
+        animation:rotate-phone 2.2s ease-in-out infinite;
+      }
+      .orientation-phone::before { content:""; position:absolute; width:18px; height:3px; border-radius:3px; background:#d3a0aa; left:50%; bottom:7px; transform:translateX(-50%); }
+      .orientation-phone::after { content:"✿"; position:absolute; left:50%; top:50%; color:#c78c9a; font-size:23px; transform:translate(-50%,-50%); }
+      @keyframes rotate-phone { 0%,18% { transform:rotate(0); } 55%,80% { transform:rotate(90deg); } 100% { transform:rotate(90deg); } }
+      .orientation-title { margin:0 0 10px; font:500 22px/1.5 "STSong","Songti SC",serif; letter-spacing:.12em; }
+      .orientation-copy { margin:0; color:#838493; font-size:13px; line-height:1.9; }
+      .orientation-credit { margin-top:24px; color:#a77b88; font-size:10px; letter-spacing:.19em; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+<main id="game" aria-label="晚风借我一封信，视觉小说">
+  <section class="orientation-guide" role="status" aria-live="polite">
+    <div class="orientation-inner">
+      <div class="orientation-phone" aria-hidden="true"></div>
+      <h1 class="orientation-title">请将手机横过来</h1>
+      <p class="orientation-copy">故事将在横屏中展开。<br>旋转手机后，就能继续这段秋日来信。</p>
+      <div class="orientation-credit">THOMAS 制作出品</div>
+    </div>
+  </section>
+  <img id="backdrop" alt="">
+  <div id="wash"></div>
+  <div id="ambience" class="leaves" aria-hidden="true"><canvas id="fx-canvas"></canvas></div>
+  <div class="grain"></div>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">✿</span><span>秋日来信 · VISUAL NOVEL</span></div>
+    <div class="top-controls">
+      <button class="icon-btn" id="log-button" title="回看对话" aria-label="回看对话">☷</button>
+      <button class="icon-btn active" id="music-button" title="关闭音乐" aria-label="关闭音乐">♫</button>
+      <button class="icon-btn active" id="voice-button" title="关闭角色叹气音效" aria-label="关闭角色叹气音效">〰</button>
+    </div>
+  </header>
+  <div class="chapter-tag" id="chapter"></div>
+  <div id="portrait-stage"><div id="portrait-body">
+    <img id="portrait" alt="">
+    <svg id="face-effects" viewBox="0 0 1024 1536" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+      <defs><filter id="cheek-soften" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="19"/></filter></defs>
+      <g id="face-blush" filter="url(#cheek-soften)" fill="#ef668e"><ellipse id="cheek-left" rx="58" ry="29"/><ellipse id="cheek-right" rx="58" ry="29"/></g>
+      <g id="face-hearts-anchor"><g id="face-hearts" fill="#f8aac2"><path d="M0 11C-22-4-17-22-3-20 4-19 8-12 8-12s4-8 13-7c16 2 17 19-1 31L8 22Z"/><circle cx="46" cy="-24" r="7" opacity=".65"/></g></g>
+      <g id="face-breath-anchor"><g id="face-breath" fill="none" stroke="#fff8f7" stroke-width="7" stroke-linecap="round" opacity=".85"><path d="M5 2C24-5 27-22 52-26"/><path d="M21 20C41 8 50-12 76-13"/><path d="M45 31C62 20 69 9 86 4"/></g></g>
+      <g id="face-tears" fill="#cdebf5" stroke="#fff" stroke-width="3"><ellipse id="tear-left" rx="7" ry="16"/><ellipse id="tear-right" rx="7" ry="16"/></g>
+    </svg>
+  </div></div>
+  <div class="nameplate" id="nameplate"></div>
+  <section class="dialogue-wrap" aria-live="polite">
+    <div class="dialogue" id="dialogue">
+      <div class="dialogue-head"><span id="speaker"></span><span id="scene-label"></span></div>
+      <div id="text"></div>
+      <div class="dialogue-foot"><span id="bgm-label">♫ 秋日钢琴 · 日常</span><span class="next-hint"><span class="desktop-hint">点击继续</span><span class="mobile-hint">轻触继续</span> <span class="next-arrow">⌄</span></span></div>
+    </div>
+  </section>
+  <div class="progress-track"><div id="progress"></div></div>
+  <div class="choices" id="choices" aria-label="剧情选项"></div>
+  <div class="endcard" id="endcard">
+    <div class="end-inner">
+      <div class="end-mark">✦　✦　✦</div>
+      <h2 id="end-title"></h2>
+      <p id="end-copy"></p>
+      <button class="end-button" id="replay-button">从头再读</button>
+    </div>
+  </div>
+  <aside class="log-panel" id="log-panel">
+    <div class="log-head"><h2>读过的句子</h2><button class="log-close" id="log-close" aria-label="关闭">×</button></div>
+    <div id="log-list"></div>
+  </aside>
+  <div class="toast" id="toast"></div>
+  <div class="start-screen" id="start-screen">
+    <div class="start-card">
+      <section class="menu-view active" id="menu-home">
+        <div class="start-overline">一封写给秋天的信</div>
+        <h1>晚风借我一封信</h1>
+        <div class="start-sub">有些喜欢，刚好来得及说给当时的你。</div>
+        <div class="start-ornament"></div>
+        <p class="start-description">从高二开学的第一阵风开始。<br>在课桌、操场和放学路上，陪三个人走一段只属于青春的路。</p>
+        <nav class="menu-nav" aria-label="主菜单">
+          <button class="start-button" id="start-button">开始游戏</button>
+          <button class="menu-secondary" id="about-button">关于</button>
+          <button class="menu-secondary" id="settings-button">游戏设置</button>
+        </nav>
+        <div class="menu-credit">THOMAS 制作出品</div>
+        <div class="start-note">建议戴耳机 · 轻触角色看脸红、听轻声</div>
+      </section>
+      <section class="menu-view" id="about-view">
+        <button class="menu-back" data-menu-back>‹ 返回主界面</button>
+        <div class="start-overline">ABOUT THIS STORY</div>
+        <h2 class="panel-title">关于本作</h2>
+        <p class="panel-copy">一封写给秋天的信，关于课桌旁的心事、放学路上的晚风，以及那些没能说出口的告别。</p>
+        <p class="panel-copy">愿每一段相遇，都在记忆里留下温柔的回声。</p>
+        <div class="about-mark">THOMAS 制作出品</div>
+        <a class="official-link" href="https://thomas-ai.space" target="_blank" rel="noopener noreferrer">访问官网　↗</a>
+      </section>
+      <section class="menu-view" id="settings-view">
+        <button class="menu-back" data-menu-back>‹ 返回主界面</button>
+        <div class="start-overline">PREFERENCES</div>
+        <h2 class="panel-title">游戏设置</h2>
+        <div class="settings-list">
+          <label class="setting-row" for="setting-music"><span>背景音乐<span class="setting-description">秋日钢琴与离别曲</span></span><input class="setting-switch" id="setting-music" type="checkbox" checked></label>
+          <label class="setting-row" for="setting-voice"><span>角色叹气音效<span class="setting-description">触碰与低落对白时播放</span></span><input class="setting-switch" id="setting-voice" type="checkbox" checked></label>
+          <div class="setting-row"><label for="setting-speed">文字速度<span class="setting-description">调整打字机显示速度</span></label><div class="range-wrap"><input class="setting-range" id="setting-speed" type="range" min="15" max="50" value="31"><span class="range-label" id="setting-speed-label">标准 · 31</span></div></div>
+        </div>
+        <div class="start-note">设置会立即生效</div>
+      </section>
+    </div>
+  </div>
+</main>
+<script>
+"use strict";
+
+// 场景与角色素材保存在本地；无法读取图片时会回退到内嵌 SVG。
+const characters = {
+  "森川汐": { color:"#252837", accent:"#dca7b1", file:"assets/characters/shio.png", description:"黑色长直发、灰蓝色眼睛，穿干净的深蓝水手领制服；安静内向的高二同桌。" },
+  "星野凛": { color:"#9b6044", accent:"#e7a17c", file:"assets/characters/rin.png", description:"浅棕色短发扎低双马尾，圆眼睛与浅浅酒窝；水手服配红色小领结，田径部高一学妹。" },
+  "月白澪": { color:"#555562", accent:"#b3a8c8", file:"assets/characters/mio.png", description:"灰黑色中长发，宽松米白针织外套和浅紫领结；总带着速写本的天台绘画少女。" }
+};
+const backgroundInfo = {
+  class:["class","高二教室：午后的光落在木课桌与靠窗的空位上。"],
+  corridor:["corridor","教学楼走廊：窗框把一整个秋天切成明亮的格子。"],
+  library:["library","图书室：高窗、书架、借书卡和安静浮动的尘埃。"],
+  playground:["playground","操场：白色跑道绕过看台，远处是被夕光染暖的校舍。"],
+  path:["path","放学小路：坡道旁的银杏渐黄，电线尽头挂着薄薄的晚霞。"],
+  rain:["rain","雨天校门：伞沿滴落的水珠映着便利店与湿润的街道。"],
+  rooftop:["rooftop","教学楼天台：矮墙、旧长椅，以及大片缓慢褪色的天空。"],
+  gym:["gym","体育馆：木地板反射顶灯，社团练习声在窗外回响。"],
+  station:["station","车站月台：列车驶过后，风把没说完的话轻轻吹散。"],
+  festival:["festival","校园祭：纸灯与手写海报在微风里摇晃，操场亮起暖色灯串。"],
+  winter:["winter","冬日教室：玻璃上有淡淡雾气，窗外的树枝安静地伸向天空。"],
+  infirmary:["infirmary","校医室：白色窗帘被风吹起，桌上有一杯温水。"],
+  hospital:["hospital","医院走廊：午后的日光安静照在长椅和一扇半开的窗上。"],
+  graduation:["graduation","毕业礼后的校门：樱花刚开，熟悉的教学楼被春光照亮。"]
+};
+const backgroundAssets = {
+  class:"assets/backgrounds/classroom.jpg", corridor:"assets/backgrounds/corridor.jpg",
+  library:"assets/backgrounds/library.jpg", playground:"assets/backgrounds/track.jpg",
+  path:"assets/backgrounds/path.jpg", rain:"assets/backgrounds/rain-path.jpg",
+  rooftop:"assets/backgrounds/rooftop.jpg", gym:"assets/backgrounds/gym.jpg",
+  station:"assets/backgrounds/station.jpg", festival:"assets/backgrounds/festival.jpg",
+  winter:"assets/backgrounds/winter.jpg", infirmary:"assets/backgrounds/hospital.jpg",
+  hospital:"assets/backgrounds/hospital.jpg", graduation:"assets/backgrounds/graduation.jpg"
+};
+
+const common = [
+ {chapter:"序章 · 九月的座位",bg:"class",music:"daily",lines:[
+  ["我","九月一日。教室里有粉笔灰、晒热的窗帘，还有暑假结束以后大家都不太熟练的早安。","none"],
+  ["我","我在靠窗第三排坐下。桌角不知被谁画了一枚小小的四瓣花。","none"],
+  ["森川汐","那是我画的。昨天值日的时候，笔尖不小心碰到了桌面。","shy","left"],
+  ["我","“不小心”画得还挺对称。"],
+  ["森川汐","……你是在夸我，还是在怀疑我？","smile","left"],
+  ["我","我想了想，决定把那朵花留在桌角。后来很久，我都没舍得擦掉。","none"]
+ ]},
+ {chapter:"序章 · 九月的座位",bg:"corridor",music:"daily",lines:[
+  ["我","第二节课前，走廊传来一串急促的脚步声。一个绑着双低马尾的学妹探头进来。","none"],
+  ["星野凛","学长！你是不是昨天帮我捡到学生证的人？我是星野凛，一年级田径部！","smile","right"],
+  ["我","我把学生证递过去。证件照里的她还没来得及笑，眼睛却已经圆圆的。"],
+  ["星野凛","我给你谢礼！草莓牛奶糖。一个不够的话，我明天再带。","grin","right"],
+  ["我","她把糖放在我的桌上，像完成了什么重要任务一样，转身就跑。"],
+  ["森川汐","学妹很有精神。","soft","left"]
+ ]},
+ {chapter:"序章 · 九月的座位",bg:"class",music:"daily",lines:[
+  ["我","汐把我的练习册转了个方向，在一道题的旁边写了几步演算。","none"],
+  ["森川汐","这里先移项。你刚才盯着它看了十分钟，题目不会因此自己想通。","smile","left"],
+  ["我","我盯着题目，是在等它先向我道歉。"],
+  ["森川汐","那它可能要等到放学。","smile","left"],
+  ["我","她笑起来的时候，常常先低下眼睛。我开始留意那些很轻的笑声。"],
+  ["我","也开始等，明天的课桌旁会不会有新的花。","none"]
+ ]},
+ {chapter:"第一章 · 操场边的风",bg:"playground",music:"daily",lines:[
+  ["我","体育课的接力练习结束得很晚。看台边的地砖被晒得温热，风里有刚剪过的草味。","none"],
+  ["星野凛","学长！帮我保管一下发圈，我去最后冲一次！","smile","right"],
+  ["我","她跑出几步，又回头比了个加油的手势。那根浅红色发圈在我手里轻轻晃。"],
+  ["森川汐","她每次训练都这样吗？","soft","left"],
+  ["我","差不多。我觉得她的脚步比广播里的铃声还准时。"],
+  ["我","操场那头的云慢慢散开，像有人把一天揉皱以后又耐心铺平。","none"]
+ ]},
+ {chapter:"第一章 · 操场边的风",bg:"library",music:"daily",lines:[
+  ["我","周五自习，我和汐各自借了一本书。她坐在我对面，翻页时几乎没有声音。","none"],
+  ["森川汐","你读到哪儿了？","soft","left"],
+  ["我","主角刚好遇见了一个没来得及说再见的人。"],
+  ["森川汐","那他后来有再见到那个人吗？","low","left"],
+  ["我","书还没告诉我。可能要读到最后才知道。"],
+  ["森川汐","嗯。那就读到最后吧。","soft","left"]
+ ]},
+ {chapter:"第一章 · 操场边的风",bg:"corridor",music:"daily",lines:[
+  ["我","傍晚值日，汐擦窗台，我把椅子一张张倒扣在桌上。"],
+  ["森川汐","你知道吗？我小时候住过一个靠海的地方。","low","left"],
+  ["我","那里的海是什么颜色？"],
+  ["森川汐","我不太记得了。只记得风很大，回家时总有沙子留在鞋里。","soft","left"],
+  ["我","她把抹布拧得很干，接着问我明天要不要一起去图书室。"],
+  ["我","那天以后，“明天”这两个字听上去像一个约定。","none"]
+ ]},
+ {chapter:"第二章 · 借一把伞",bg:"rain",music:"daily",lines:[
+  ["我","九月末的雨来得突然。校门口的屋檐挤满了人，雨丝把街灯拉成长长的金线。","none"],
+  ["森川汐","我带了伞。你要是不介意的话，我们一起走到车站。","shy","left"],
+  ["我","伞不算小，但我们的肩膀还是时不时碰到一起。"],
+  ["森川汐","你那边淋湿了吗？","soft","left"],
+  ["我","一点点。"],
+  ["森川汐","那边再靠过来一点。这样就不会淋到了。","shy","left"],
+  ["我","雨声很大。我庆幸自己听清了她的话，也庆幸她没有看见我耳朵发烫。"]
+ ]},
+ {chapter:"第二章 · 借一把伞",bg:"path",music:"daily",lines:[
+  ["我","雨停后，我们沿着河边的小路慢慢走。湿漉漉的银杏叶贴在地上。"],
+  ["森川汐","如果有一天离开这里，你会最想念什么？","low","left"],
+  ["我","自动贩卖机的热可可。还有……有人一起走路。"],
+  ["森川汐","那听起来很容易实现。","smile","left"],
+  ["我","她把伞收好，伞尖的水滴在地上，像一串没有写完的省略号。"],
+  ["我","“离开”被她说得很轻，我也就把它当成了一个普通的问题。","none"]
+ ]},
+ {chapter:"第二章 · 借一把伞",bg:"class",music:"daily",lines:[
+  ["我","十月的文化祭开始筹备。班主任把宣传板、节目表和一箱彩纸都交给了我们。"],
+  ["森川汐","我可以画海报。你帮我把纸压住，好吗？","smile","left"],
+  ["我","她画了校舍的屋顶。云很淡，窗户里却画了许多暖黄色的小光点。"],
+  ["我","我问她，为什么每一扇窗都亮着。"],
+  ["森川汐","这样看起来，就像每个人都有人等着回家。","low","left"],
+  ["我","她把笔帽轻轻扣好，低头在海报背面又画了一朵四瓣花。"]
+ ]},
+ {chapter:"第三章 · 秋日祭",bg:"festival",music:"daily",lines:[
+  ["我","校园祭当天，汐守着班级咖啡摊，凛穿着运动服在操场负责接力体验，澪在走廊尽头画速写。","none"],
+  ["星野凛","学长，快来试试！绕一圈回来就能拿一颗橘子糖！","grin","right"],
+  ["我","我跑得不算快，凛却把奖品郑重地放进我掌心。"],
+  ["星野凛","这颗是特等奖。我特意挑了包装没有皱的。","smile","right"],
+  ["我","她笑出浅浅的酒窝，转眼就被队友叫走了。"],
+  ["月白澪","你们的笑容，比我画的灯串亮。","soft","left"],
+  ["我","澪的素描本上，三个人都被画进了校园的同一片光里。"]
+ ]},
+ {chapter:"第三章 · 秋日祭",bg:"rooftop",music:"daily",lines:[
+  ["我","放学后，我在天台找到月白澪。她靠着矮墙画画，针织袖口沾了浅灰色的铅笔痕。"],
+  ["月白澪","坐这里的话，可以看见操场和图书室的窗子。","soft","left"],
+  ["我","她把速写本偏向我。纸上是我刚才走上楼梯的样子，书包带滑到了肩膀边。"],
+  ["月白澪","你走路的时候，会先看晚霞，再看前面的路。","smile","left"],
+  ["我","我问她，这样也画得出来吗？"],
+  ["月白澪","只要看得够久，就会记住。","soft","left"]
+ ]},
+ {chapter:"第四章 · 冬天以前",bg:"winter",music:"daily",lines:[
+  ["我","入冬以后，教室窗边多了一台小小的加湿器。每天第一节课前，汐都会帮它加水。"],
+  ["我","有一次她忘了带手套。我把自己的那副递过去，她只戴了一只。"],
+  ["森川汐","这样另一只手还可以翻书。","smile","left"],
+  ["我","她把手藏在袖子里，另一只手捏着书页角。"],
+  ["森川汐","你明年也会坐这个位置吗？","low","left"],
+  ["我","当然。除非学校把教室整个搬走。"],
+  ["我","她望了望窗外，很轻地说了一声“那就好”。","none"]
+ ]},
+ {chapter:"第四章 · 冬天以前",bg:"playground",music:"daily",lines:[
+  ["我","凛带我到空荡荡的看台上看训练。她的呼吸在冷空气里变成一小团白雾。"],
+  ["星野凛","我喜欢跑到终点的感觉。像是把脑袋里乱七八糟的事情，都暂时甩在后面了。","soft","right"],
+  ["我","“乱七八糟的事情”是什么？我问。"],
+  ["星野凛","嗯……今天的晚饭要吃什么！这种超级严肃的事。","grin","right"],
+  ["我","她回答得很快，鞋尖却在地上轻轻画着圈。"],
+  ["星野凛","学长，下次训练你也来看吧？我跑起来就不会想东想西了。","smile","right"]
+ ]},
+ {chapter:"终章 · 明年春天",bg:"path",music:"daily",lines:[
+  ["我","新学期过后，三个人都开始为不同的事情忙碌。借书卡越叠越厚，操场边的风却还是那阵风。"],
+  ["我","毕业前最后一次班会，老师让我们写下想在今年留下的事。"],
+  ["我","汐的笔尖停在纸上；凛坐在门口的台阶晃腿；澪把速写本抱在胸前。"],
+  ["我","我突然很想把这一天过得慢一点。慢到每个人都来得及把心里的话说完。"],
+  ["我","可时间没有听见我的请求。它只是翻过了日历，继续往前。","none"]
+ ]},
+ {chapter:"终章 · 明年春天",bg:"class",music:"daily",lines:[
+  ["我","毕业礼前一周，三个人都各自找我说了些平常的话。没有人说起再见，却像都在记住什么。"],
+  ["我","放学铃响了。我站在熟悉的教室里，窗外是我们看过很多次的那片天。"],
+  ["我","汐在身边收拾书本。门口，凛朝我挥手。楼梯上方，澪抱着速写本望向天台。"],
+  ["我","这一刻，我想把目光交给谁呢？"],
+  ["我","有些故事，要从一次小小的选择开始。","none"]
+ ]},
+ {type:"choice",question:"那天放学，你看向——",options:[
+  {label:"①　身边的同桌森川汐",route:"shio"},
+  {label:"②　教室门口招手的水手服学妹星野凛",route:"rin"},
+  {label:"③　天台抱着速写本的月白澪",route:"mio"}
+ ]}
+];
+
+// 每个女孩的独立线路都从共同回忆出发；每段场景均标记背景、日常/离别配乐与立绘表情。
+const routes = {
+ shio:[
+  {chapter:"汐线 · 01　借来的耳机",bg:"class",music:"daily",lines:[
+   ["我","我看向汐。她把书本抱在胸前，像刚想说什么，又把话放回了心里。"],
+   ["森川汐","毕业后的班级合照，你想站在哪里？","shy","left"],
+   ["我","如果能选，我想站你旁边。"],
+   ["森川汐","那我就不换位置了。","smile","left"],
+   ["我","她回答得很轻，手指却悄悄把合照通知折成了一个小小的方块。"]
+  ]},
+  {chapter:"汐线 · 01　借来的耳机",bg:"library",music:"daily",lines:[
+   ["我","图书室里，我们挨着坐在窗边。两本书中间，放着一副旧耳机。"],
+   ["森川汐","左边有一点杂音，你介意吗？","soft","left"],
+   ["我","只要右边那只给你，就不介意。"],
+   ["森川汐","这样听起来像是你比较吃亏。","smile","left"],
+   ["我","她把一边耳机递给我。琴声很轻，轻得像一封没拆开的信。"],
+   ["森川汐","这首曲子，我以前在另一个地方听过。后来就很少想起来了。","low","left"]
+  ]},
+  {chapter:"汐线 · 02　雨伞的半边",bg:"rain",music:"daily",lines:[
+   ["我","第二场秋雨来时，汐撑着同一把伞来找我。伞柄上多了一圈蓝色胶带。"],
+   ["我","我问她是不是换了新伞。"],
+   ["森川汐","没有。只是想让你容易认出来。","shy","left"],
+   ["我","我把书包往另一侧挪了挪。雨点落在伞面上，我们并肩走过熟悉的路。"],
+   ["森川汐","你以后会不会记得，今天雨下得很小？","soft","left"],
+   ["我","我会记得你把伞往我这边偏了三次。"]
+  ]},
+  {chapter:"汐线 · 02　雨伞的半边",bg:"path",music:"daily",lines:[
+   ["我","放学路上，我们经过河堤。树叶落在汐的肩头，她没有发现。"],
+   ["我","我伸手替她拿掉。两个人都停顿了一下。"],
+   ["森川汐","谢谢。你有时候很像我故事里的人。","shy","left"],
+   ["我","哪一种故事？"],
+   ["森川汐","那种一直在身边，直到书快读完才发现自己舍不得的人。","low","left"],
+   ["我","我想接话，最后只和她一起慢慢走到了车站。"]
+  ]},
+  {chapter:"汐线 · 03　晚自习的光",bg:"class",music:"daily",lines:[
+   ["我","晚自习停电了三分钟。窗外的操场灯还亮着，教室里有人小声说笑。"],
+   ["森川汐","你看得见吗？","soft","left"],
+   ["我","我看得见窗边的你。"],
+   ["森川汐","……我也看得见你。","shy","left"],
+   ["我","灯亮回来时，她的耳机线绕在我们两张课桌之间。"],
+   ["我","那晚之后，耳机只剩下一副。汐说，分成左右两边就够了。"]
+  ]},
+  {chapter:"汐线 · 03　晚自习的光",bg:"library",music:"daily",lines:[
+   ["我","我们开始交换书。汐在每本书的扉页贴一张小纸签，上面写着她喜欢的那一句。"],
+   ["森川汐","如果只看最喜欢的句子，就像只看见一个人的笑脸。","soft","left"],
+   ["我","那你想让我看见什么？"],
+   ["森川汐","全部。开心的，犹豫的，还有不知道怎么开口的。","low","left"],
+   ["我","她说完，马上笑了一下，像是怕我听出话里的重量。"],
+   ["森川汐","等你读完这本，再告诉我你的那一句。"]
+  ]},
+  {chapter:"汐线 · 04　看台上的约定",bg:"playground",music:"daily",lines:[
+   ["我","运动会前一天，汐坐在看台上帮我别号码布。她的发梢碰到我的手背。"],
+   ["森川汐","别跑太快。你上次差点把鞋带甩开。","smile","left"],
+   ["我","你是担心鞋带，还是担心我？"],
+   ["森川汐","都担心。","shy","left"],
+   ["我","她帮我把结打紧，又在衣角抚平一道不明显的折痕。"],
+   ["我","我跑完以后，汐递来的水瓶刚好是温的。"]
+  ]},
+  {chapter:"汐线 · 04　看台上的约定",bg:"playground",music:"daily",lines:[
+   ["我","比赛结束后，我们留在空看台上看最后一组接力。夕阳把跑道染成淡淡的金色。"],
+   ["森川汐","这里很好。能看见大家，却不用马上加入他们。","soft","left"],
+   ["我","你可以一直坐在我旁边。"],
+   ["森川汐","你说的“一直”，有多长？","low","left"],
+   ["我","我没有答案，只能把手边的毛巾递给她。"],
+   ["森川汐","那先到今天吧。今天很长，也很好。","smile","left"]
+  ]},
+  {chapter:"汐线 · 05　屋顶上的云",bg:"rooftop",music:"daily",lines:[
+   ["我","文化祭结束后的屋顶上，汐带来了两盒牛奶和一张没有寄出的明信片。"],
+   ["森川汐","我有时候会写信，但不知道该寄给谁。","soft","left"],
+   ["我","那写给明天的自己呢？"],
+   ["森川汐","明天的我大概会忘记今天为什么难过。","low","left"],
+   ["我","我说，那我帮你记住。她看了我很久，轻轻点头。"],
+   ["森川汐","如果你也记得的话，我就不会把今天弄丢了。"]
+  ]},
+  {chapter:"汐线 · 05　屋顶上的云",bg:"rooftop",music:"daily",lines:[
+   ["我","我们在天台并排坐着。风把明信片的空白页吹起来，又落回她膝上。"],
+   ["森川汐","你最想留下些什么？"],
+   ["我","一个普通的下午，有人陪我坐着看云。"],
+   ["森川汐","那我可以写进信里吗？","smile","left"],
+   ["我","当然。只要收信人是我。"],
+   ["森川汐","好。只是要给我一点时间，等我想清楚要写什么。","shy","left"]
+  ]},
+  {chapter:"汐线 · 06　热可可",bg:"path",music:"daily",lines:[
+   ["我","寒潮来的那天，汐在自动贩卖机前犹豫了很久。"],
+   ["森川汐","每次都买热可可，会不会显得我没有别的爱好？","smile","left"],
+   ["我","你也可以偶尔买两罐。"],
+   ["森川汐","这倒是个很有道理的提议。","smile","left"],
+   ["我","她把一罐塞给我。回家路上，罐子里的热气暖着我们的手掌。"],
+   ["森川汐","下次还一起走这条路，好不好？"]
+  ]},
+  {chapter:"汐线 · 06　热可可",bg:"winter",music:"daily",lines:[
+   ["我","冬天的最后一场小雪没有积起来。我们在教室里写毕业纪念册。"],
+   ["我","汐在我的纪念册上画了四瓣花，下面写着“谢谢你坐在窗边”。"],
+   ["森川汐","我写得很普通吧？","shy","left"],
+   ["我","我把那页看了好几遍，所以一点也不普通。"],
+   ["森川汐","那你也写一页给我。不要写客套话。","soft","left"],
+   ["我","我写：如果可以，我还想和你一起读下一本书。"]
+  ]},
+  {chapter:"汐线 · 07　没说完的话",bg:"class",music:"daily",lines:[
+   ["我","春天快来时，汐忽然开始把抽屉收拾得很整齐。书签、橡皮和铅笔都按颜色排好。"],
+   ["我","我问她是不是准备参加什么比赛。"],
+   ["森川汐","只是觉得，东西放好以后，心里会安静一点。","low","left"],
+   ["我","她把一本借来的小说放到我桌上。扉页写了新的书签。"],
+   ["森川汐","这是最后一章。读完以后，告诉我结局是不是温柔。","soft","left"],
+   ["我","我答应了。她的笑容和平时一样，我却觉得少了一点声音。"]
+  ]},
+  {chapter:"汐线 · 07　没说完的话",bg:"infirmary",music:"daily",lines:[
+   ["我","午后，汐在楼梯口脸色发白。我陪她去校医室，她说只是没吃早饭。"],
+   ["森川汐","别担心。我没事，只是昨晚睡得不太好。","soft","left"],
+   ["我","她握着温水杯，指节比杯壁还白。"],
+   ["我","我想问她最近是不是遇到了什么事。"],
+   ["森川汐","有一点事情。不过我可以自己想明白的。","smile","left"],
+   ["我","她说完，伸手碰了碰我袖口，像在安慰那个不知道该怎么问的我。"]
+  ]},
+  {chapter:"汐线 · 08　空了一页的信",bg:"rooftop",music:"daily",lines:[
+   ["我","周末我们又去了天台。汐带来一叠明信片，最上面那张仍然没有写地址。"],
+   ["森川汐","我想起小时候搬家的时候，没来得及和邻居家的女孩道别。","low","left"],
+   ["我","后来呢？"],
+   ["森川汐","后来我忘了她的名字。但有时还会想，她是不是也记得那条小巷。","soft","left"],
+   ["我","我想说，我会记得你的名字。"],
+   ["我","话到嘴边，我只说了“我在这里”。汐把明信片收进了书里。"]
+  ]},
+  {chapter:"汐线 · 08　空了一页的信",bg:"path",music:"daily",lines:[
+   ["我","回家的路上，汐把步子放得很慢。晚霞落在她的发梢，像一层快要融化的金色。"],
+   ["森川汐","如果一个人没说再见就走了，你会生气吗？","low","left"],
+   ["我","会。因为我会一直不知道是不是还能等她。"],
+   ["森川汐","那如果她是因为不知道怎么说呢？"],
+   ["我","我想了很久。也许我会希望，她至少让我知道自己没做错什么。"],
+   ["森川汐","……嗯。我记住了。","low","left"]
+  ]},
+  {chapter:"汐线 · 09　毕业照",bg:"graduation",music:"daily",lines:[
+   ["我","毕业照拍摄那天，汐站到了我旁边。她的袖口很整齐，发间别着一枚淡粉色发夹。"],
+   ["我","摄影师数到三时，她轻轻碰了一下我的手指。"],
+   ["森川汐","这样以后看照片，你就不会站得太远。","shy","left"],
+   ["我","快门响了。那一瞬间，我没有看镜头，而是看见她笑了。"],
+   ["森川汐","你在看哪里？","smile","left"],
+   ["我","看我最想记住的人。"]
+  ]},
+  {chapter:"汐线 · 09　毕业照",bg:"class",music:"daily",lines:[
+   ["我","最后一周，汐把我们交换过的书一本本还回来。每本书里都夹着一张小纸签。"],
+   ["我","纸签上有她写的喜欢句子，字迹从清秀慢慢变得有些颤。"],
+   ["森川汐","我怕以后会忘记这些书是从谁那里借来的。","soft","left"],
+   ["我","你可以把它们都还给我，想看时再借。"],
+   ["森川汐","如果我还得很远呢？"],
+   ["我","那我就把借书卡留着，等你回来。","none"]
+  ]},
+  {chapter:"汐线 · 10　列车来之前",bg:"station",music:"daily",lines:[
+   ["我","毕业礼结束后，汐请我陪她去车站附近买文具。她今天的话很少，笑容却比平常更温柔。"],
+   ["森川汐","我一直没告诉你。爸爸妈妈决定让我去很远的地方继续读书。","low","left"],
+   ["我","什么时候决定的？"],
+   ["森川汐","上个月。我不敢说。我想把最后这些日子，好好地留给我们。","tears","left"],
+   ["我","我没有怪她。那些没来得及问的问题，一下子都失去了答案。"],
+   ["森川汐","对不起。我不知道怎么在你面前说再见。","tears","left"],
+   ["我","我想告诉她，我喜欢她。可列车进站的风把声音从我喉咙里吹散了。"]
+  ]},
+  {chapter:"汐线 · 10　列车来之前",bg:"path",music:"farewell",lines:[
+   ["我","我们沿着从前走过的路，慢慢回到校门口。两个人都没有提起下一站。"],
+   ["森川汐","我其实一直很喜欢和你坐在一起。你翻书的时候，会把书页压住，不让风吹走。","tears","left"],
+   ["我","我也喜欢你。喜欢你画的花，喜欢你递来的耳机，喜欢你每次都把伞往我这边偏。"],
+   ["森川汐","那我就把这些都带走。可以吗？","tears","left"],
+   ["我","可以。只要你记得，这些也曾经属于我们。"],
+   ["森川汐","我会记得。","tears","left"]
+  ]},
+  {chapter:"汐线 · 终章　借书卡",bg:"graduation",music:"farewell",lines:[
+   ["我","几天后，汐离开了这座城市。毕业典礼的合照洗出来，我把那张照片放进课桌抽屉。"],
+   ["我","她在照片里笑着，肩膀轻轻挨着我。没有留下新的地址，也没有再回过消息。"],
+   ["我","我把她最后借我的书还进图书室。那张空白借书卡，留在了我手里。"],
+   ["我","有时候，我还会把它翻出来，想起有人在故事最后一页等我回答。"],
+   ["我","我没有再等到她。那张合照却一直陪着我，像春天来过的证据。","none"]
+  ],ending:["汐线 · 借书卡","有些人没有说再见，却把一整个季节留在了你身边。"]}
+ ],
+ rin:[
+  {chapter:"凛线 · 01　门口的糖果",bg:"corridor",music:"daily",lines:[
+   ["我","我看向门口的凛。她把一颗橘子糖举过头顶，像举着刚赢来的奖牌。"],
+   ["星野凛","学长，今天的谢礼是橘子味！我觉得它特别适合秋天。","grin","right"],
+   ["我","你上周送的是草莓味。"],
+   ["星野凛","那是夏天的味道。季节变了，糖也要换！","smile","right"],
+   ["我","她说得理直气壮，眼睛弯成两道月牙。"]
+  ]},
+  {chapter:"凛线 · 01　门口的糖果",bg:"playground",music:"daily",lines:[
+   ["我","从那天起，凛几乎每天都跑来高二教室门口。她说自己只是路过。"],
+   ["星野凛","学长，路过的人能不能借你两分钟？我跑完步以后想喝水。","smile","right"],
+   ["我","我递给她一瓶水。"],
+   ["星野凛","谢谢！还有这个，蜂蜜饼干。我妈妈……我同学做的，多做了一份。","soft","right"],
+   ["我","她的话中间停了一下，随后把饼干塞进我手里。"],
+   ["星野凛","好吃的话，下次我再带。"]
+  ]},
+  {chapter:"凛线 · 02　最后一圈",bg:"playground",music:"daily",lines:[
+   ["我","田径部训练时，我坐在看台帮凛计圈。她跑到最后一圈，抬手朝我比了个小小的胜利手势。"],
+   ["我","冲过终点，她弯下腰喘气，发梢贴在脸颊上。"],
+   ["星野凛","我今天比昨天快了零点二秒！学长，你有看到吗？","grin","right"],
+   ["我","我有看到你最后那一下差点踩到自己的鞋带。"],
+   ["星野凛","那是冲刺技巧的一部分！","grin","right"],
+   ["我","她笑起来有两个浅浅的酒窝。我把这件事记得很清楚。"]
+  ]},
+  {chapter:"凛线 · 02　最后一圈",bg:"gym",music:"daily",lines:[
+   ["我","下雨天训练改在体育馆。凛教我起跑，结果我先把自己绊了个趔趄。"],
+   ["星野凛","学长的起跑姿势好像刚睡醒的猫。","smile","right"],
+   ["我","你这样形容，我很难严肃起来。"],
+   ["星野凛","那就不要严肃！跑步最重要的是开心。","grin","right"],
+   ["我","她示范起跑的动作。哨声响起时，她的眼睛亮得像雨后操场上的灯。"],
+   ["我","我追不上她，但她跑完会停下来等我一起回教室。"]
+  ]},
+  {chapter:"凛线 · 03　便利店的灯",bg:"path",music:"daily",lines:[
+   ["我","有时训练后，我们会绕到车站前的便利店。凛总挑颜色最亮的果汁。"],
+   ["星野凛","这个葡萄味看起来像紫色的晴天！","smile","right"],
+   ["我","晴天也有紫色吗？"],
+   ["星野凛","有啊。太阳下山的时候，天空会先变紫，再变成晚霞。"],
+   ["我","她握着饮料瓶，忽然安静地看着街对面的住宅楼。"],
+   ["我","几秒后，她转过来笑，说要和我比赛谁先走到校门口。","none"]
+  ]},
+  {chapter:"凛线 · 03　便利店的灯",bg:"rain",music:"daily",lines:[
+   ["我","秋雨落下来，我们挤在便利店门口的屋檐下。凛把最后一颗糖递给我。"],
+   ["我","你不留给自己吗？"],
+   ["星野凛","我有很多啊。这颗是今天最好吃的，想留给学长。","smile","right"],
+   ["我","她的袖口湿了一片。我把自己的围巾递过去。"],
+   ["星野凛","我家里有……我同学也有围巾！我明天还你。","low","right"],
+   ["我","她把围巾绕好，声音藏在雨里，变得小小的。"]
+  ]},
+  {chapter:"凛线 · 04　操场看台",bg:"playground",music:"daily",lines:[
+   ["我","校园祭前，凛练习接力练到天色全暗。我们并肩坐在看台最后一排。"],
+   ["星野凛","学长陪着的时候，最后一圈好像也没那么长了。","smile","right"],
+   ["我","那我以后每一圈都陪你。"],
+   ["星野凛","每一圈？那可是很久哦。","shy","right"],
+   ["我","我假装在认真计算。她把肩膀轻轻靠过来，笑出了酒窝。"],
+   ["我","看台下的风穿过空跑道，吹起她的发圈。"]
+  ]},
+  {chapter:"凛线 · 04　操场看台",bg:"festival",music:"daily",lines:[
+   ["我","校园祭的摊位前，凛送给我一个自己烤的蜂蜜小蛋糕。"],
+   ["星野凛","虽然边边烤得有点焦，但爱心形状是成功的！","grin","right"],
+   ["我","我咬了一口。很甜，带一点点脆脆的焦香。"],
+   ["星野凛","好吃吗？","shy","right"],
+   ["我","好吃。你做的东西，总有很特别的味道。"],
+   ["星野凛","那我以后还给你做。说好了，不许只吃一半。","smile","right"]
+  ]},
+  {chapter:"凛线 · 05　放学后的散步",bg:"path",music:"daily",lines:[
+   ["我","我们一起走过河边的小路。凛踢开一颗小石子，它滚进路旁的草丛。"],
+   ["星野凛","我喜欢和学长走路。你从来不嫌我讲话太多。","soft","right"],
+   ["我","你安静下来的时候，我会担心是不是发生了什么。"],
+   ["星野凛","那我还是多讲话好了。比如——学长最喜欢哪一种糖？","smile","right"],
+   ["我","我们聊到天色暗下来。她没有再看向那片住宅楼。"],
+   ["我","我也没有追问，那些她忽然停住的话都去了哪里。","none"]
+  ]},
+  {chapter:"凛线 · 05　放学后的散步",bg:"rooftop",music:"daily",lines:[
+   ["我","凛第一次来天台，是为了把一包没来得及送出的饼干交给我。"],
+   ["星野凛","我每次想找学长，就会变得特别开心。可是有时候开心得太快，会有一点奇怪。","low","right"],
+   ["我","奇怪在哪里？"],
+   ["星野凛","像是忽然想起，快乐不是每天都会有。","low","right"],
+   ["我","她很快把话题扯到云的形状，笑容又明亮起来。"],
+   ["星野凛","看，那朵像不像一只跑得很慢的小狗？"]
+  ]},
+  {chapter:"凛线 · 06　没有回答的周末",bg:"class",music:"daily",lines:[
+   ["我","周末田径部临时停训。我照常等在校门边，凛却没有出现。"],
+   ["我","手机里只有一条很短的讯息：今天有点事，不能来啦。"],
+   ["我","星期一她来得很早，眼圈有一点红，却把笑容挂得和平常一样高。"],
+   ["星野凛","昨天睡过头啦！学长有没有想我一点点？","smile","right"],
+   ["我","有。我说。她的笑容慢了一拍，像是险些没有接住这句话。"],
+   ["星野凛","那我今天要多待一会儿。"]
+  ]},
+  {chapter:"凛线 · 06　没有回答的周末",bg:"playground",music:"daily",lines:[
+   ["我","练习结束后，凛坐在跑道旁边系鞋带。她把鞋带拆开，又重新系了一遍。"],
+   ["星野凛","学长，你有没有觉得，有些大人吵架的时候，连空气都会变重？","low","right"],
+   ["我","我不知道该怎么回答，只在她旁边坐下来。"],
+   ["星野凛","没关系。我今天只是想说出来，不用马上解决。","soft","right"],
+   ["我","她把额头抵在膝盖上，沉默了一小会儿。"],
+   ["星野凛","对不起，我刚才走神了。我们回去吧。","smile","right"]
+  ]},
+  {chapter:"凛线 · 07　送你的围巾",bg:"winter",music:"daily",lines:[
+   ["我","天冷下来，凛把那条围巾还给我，还多织了一小段红色的流苏。"],
+   ["星野凛","我在社团活动室练的。歪歪扭扭的地方，请当作设计！","grin","right"],
+   ["我","我把围巾绕在脖子上。"],
+   ["星野凛","很好看！以后学长戴它的时候，就会想到我。","shy","right"],
+   ["我","我会每天戴。"],
+   ["星野凛","那我就每天都能偷偷出现一下。","smile","right"]
+  ]},
+  {chapter:"凛线 · 07　送你的围巾",bg:"library",music:"daily",lines:[
+   ["我","凛陪我在图书室准备考试。她把课本摊开，却很久没有翻页。"],
+   ["我","你在想什么？"],
+   ["星野凛","我在想，要是有一天忽然不能来找你，学长会不会以为我不喜欢你了？","low","right"],
+   ["我","我会先担心你，然后再等你回来解释。"],
+   ["星野凛","嗯。那就好。","soft","right"],
+   ["我","她靠着我的肩膀眯了一会儿，指尖还捏着没吃完的糖。"]
+  ]},
+  {chapter:"凛线 · 08　最亮的灯串",bg:"festival",music:"daily",lines:[
+   ["我","冬日灯会那天，凛把一枚小小的星星发夹别在头发上。"],
+   ["星野凛","这个是抽奖抽到的。我觉得星星很像操场的灯。","smile","right"],
+   ["我","你站在灯下，比它们还亮。"],
+   ["星野凛","学长最近很会说让人心跳加快的话哦。","shy","right"],
+   ["我","她的笑容停留了很久。灯串亮起时，她忽然握住我的手。"],
+   ["星野凛","今天回家的路，我们慢一点走，好不好？"]
+  ]},
+  {chapter:"凛线 · 08　最亮的灯串",bg:"path",music:"daily",lines:[
+   ["我","从灯会回去的路上，凛把手藏进我的外套口袋。"],
+   ["星野凛","我有时候觉得，只要和学长在一起，明天就会是好天气。","soft","right"],
+   ["我","那要是明天下雨呢？"],
+   ["星野凛","那我们就再借一把伞。","smile","right"],
+   ["我","她抬头看我。我们都没有把手拿出来。"],
+   ["我","路灯把影子照得很近，像两句终于靠在一起的话。","none"]
+  ]},
+  {chapter:"凛线 · 09　门口的空位",bg:"corridor",music:"daily",lines:[
+   ["我","开学后的星期一，凛没有像往常那样在教室门口出现。"],
+   ["我","她的田径部队友说，凛周末没有回讯息。"],
+   ["我","午后，我在储物柜里看见一包糖果，包装上贴着她熟悉的小纸条。"],
+   ["我","“今天也要加油。等训练结束再见。”那是她上周写的。"],
+   ["我","最后一节课结束，门口仍然空着。"],
+   ["我","我第一次发现，等待也会发出声音。","none"]
+  ]},
+  {chapter:"凛线 · 09　门口的空位",bg:"playground",music:"daily",lines:[
+   ["我","我跑遍了操场、便利店和河边的小路，最后在空看台上找到她。"],
+   ["星野凛","学长……我家里出了些事。爸爸妈妈吵得很厉害，我们今天晚上就要搬走。","low","right"],
+   ["我","她手里攥着一张车票，指尖一直在发抖。"],
+   ["星野凛","我没有时间回家拿我的东西。也没有时间和大家好好道别。","tears","right"],
+   ["我","我想问她以后会去哪儿，却知道她自己也不知道。"],
+   ["我","黄昏一点点落下来，操场的白线变得模糊。"]
+  ]},
+  {chapter:"凛线 · 10　最后一圈",bg:"playground",music:"farewell",lines:[
+   ["我","凛站起来，抱住我。她把脸埋在我的肩膀上，还是笑着的样子。"],
+   ["星野凛","学长，今天我跑得好慢。你能不能陪我坐一会儿？","tears","right"],
+   ["我","我抱住她，听见她的呼吸轻轻颤了一下。"],
+   ["我","她没有哭出声。肩头却一点点湿了。"],
+   ["星野凛","我最喜欢和你在一起。你让我觉得，自己可以一直开心下去。","tears","right"],
+   ["我","如果你还想跑回来，就沿着这条跑道跑。我会在终点等你。"],
+   ["星野凛","好。最后一圈，学长一定要看着我哦。","tears","right"]
+  ]},
+  {chapter:"凛线 · 10　最后一圈",bg:"station",music:"farewell",lines:[
+   ["我","她离开前，塞给我一封折得很小的信。列车广播响起时，她朝我挥了挥手。"],
+   ["星野凛","学长，糖果要记得吃。别只放在抽屉里。","tears","right"],
+   ["我","我想说很多话，最后只把那条红色流苏的围巾绕紧了一些。"],
+   ["我","车门关上。她的身影隔着玻璃，渐渐被站台的灯光遮住。"],
+   ["我","那天夜里，我拆开了那封信。背面有一行很小很小的字。","none"]
+  ]},
+  {chapter:"凛线 · 终章　橘子糖",bg:"class",music:"farewell",lines:[
+   ["我","“能喜欢上学长，真的很幸福。对不起，我没办法陪你走到最后。”"],
+   ["我","第二天，我照常在教室门口等了一会儿。凛没有来。"],
+   ["我","后来我把那包糖吃完了。每颗都是她喜欢的味道，甜得让人想起一双圆圆的眼睛。"],
+   ["我","我没有再收到她的消息。也不知道那封信辗转过多少个夜晚才来到我手里。"],
+   ["我","有些人只陪你跑过一小段，却让你记住了很久很久的终点。","none"]
+  ],ending:["凛线 · 橘子糖","那天以后，门口的脚步声再也没有为我停下。"]}
+ ],
+ mio:[
+  {chapter:"澪线 · 01　画里的我",bg:"rooftop",music:"daily",lines:[
+   ["我","我看向抱着速写本的澪。她把铅笔夹在书页里，像是早就猜到我会走过去。"],
+   ["月白澪","今天的云很好看。我想把它画下来。你愿意陪我一会儿吗？","soft","right"],
+   ["我","我在她旁边坐下。她画了云、矮墙，还有低头看云的我。"],
+   ["月白澪","你本人比画里更安静。","smile","right"],
+   ["我","也许是因为我还没想好要说什么。"],
+   ["月白澪","没关系。坐在这里，本来就不需要一直说话。"]
+  ]},
+  {chapter:"澪线 · 01　画里的我",bg:"rooftop",music:"daily",lines:[
+   ["我","澪的速写本里夹着一张小票，背面画了几朵校园里常见的野花。"],
+   ["我","你画这些花做什么？"],
+   ["月白澪","它们开得很短。想记住它们的时候，就先画下来。","soft","right"],
+   ["我","我问她，如果记住了，还会害怕它们谢掉吗？"],
+   ["月白澪","会啊。所以才要多看一会儿。","low","right"],
+   ["我","她低头继续画。风把她的发梢吹到脸颊边。"]
+  ]},
+  {chapter:"澪线 · 02　雨声的线条",bg:"rain",music:"daily",lines:[
+   ["我","天台下起雨，我们跑到走廊躲雨。澪把速写本护在外套里面。"],
+   ["月白澪","纸怕水。画好的东西也怕。","soft","right"],
+   ["我","但你自己淋湿了。"],
+   ["月白澪","衣服晒一晒就干了。画不是每次都能重来。","smile","right"],
+   ["我","我递给她一块干毛巾。她接过时，手指有些凉。"],
+   ["月白澪","谢谢。你的手好暖。","shy","right"]
+  ]},
+  {chapter:"澪线 · 02　雨声的线条",bg:"library",music:"daily",lines:[
+   ["我","雨停后，我们在图书室并排读画册。澪在空白处画下窗外的水滴。"],
+   ["我","她画得很快，像是刚好把某种看不见的声音抓住了。"],
+   ["月白澪","下雨的时候，我会觉得世界变慢了。","soft","right"],
+   ["我","我也喜欢雨停之后的味道。"],
+   ["月白澪","那我们可以一起等雨停。","smile","right"],
+   ["我","那句话被写在她的画页边角，笔迹很小，像一句给自己的约定。"]
+  ]},
+  {chapter:"澪线 · 03　速写本的空白",bg:"class",music:"daily",lines:[
+   ["我","澪把一张画夹在我的课本里：午后的教室、靠窗的桌椅，以及正在翻书的我。"],
+   ["我","你画了我多久？"],
+   ["月白澪","从第一节课画到下课。中间你看了三次窗外，揉了两次眼睛。","smile","right"],
+   ["我","原来我这么无聊。"],
+   ["月白澪","不是无聊。你会注意到窗外的光，也会注意到别人没说出口的话。","soft","right"],
+   ["我","她说完就合上本子，像是把更深的一层意思藏了起来。"]
+  ]},
+  {chapter:"澪线 · 03　速写本的空白",bg:"path",music:"daily",lines:[
+   ["我","放学后，我们从坡道慢慢走下去。澪把画夹在书里，抱得很紧。"],
+   ["月白澪","我不太喜欢医院的消毒水味。","low","right"],
+   ["我","你常去医院吗？"],
+   ["月白澪","以前陪别人去过。走廊的光总是白白的，让人忘记今天是晴天还是下雨。","soft","right"],
+   ["我","她说这话时很平静，仿佛只是描述画面。"],
+   ["月白澪","所以我更想把学校的夕阳画下来。颜色要暖一点。","smile","right"]
+  ]},
+  {chapter:"澪线 · 04　天台的午餐",bg:"rooftop",music:"daily",lines:[
+   ["我","午休时，我和澪在天台分一盒草莓。她把最大的一颗留给我。"],
+   ["我","明明是你带来的。"],
+   ["月白澪","你刚才帮我捡了三次橡皮。算作谢礼。","smile","right"],
+   ["我","橡皮自己一直滚到墙边，我只是把它拿回来。"],
+   ["月白澪","那我下次再弄丢一次。","shy","right"],
+   ["我","我们对视了一会儿，同时笑了出来。"]
+  ]},
+  {chapter:"澪线 · 04　天台的午餐",bg:"rooftop",music:"daily",lines:[
+   ["我","澪教我用铅笔画阴影。她握着我的手，带我轻轻划过纸面。"],
+   ["月白澪","不要急着把边缘画得很清楚。光会自己留下形状。","soft","right"],
+   ["我","我画出一团灰灰的云。"],
+   ["月白澪","是很有个性的云。","smile","right"],
+   ["我","她的手停留得比需要的时间久了一点，然后很快收了回去。"],
+   ["我","纸上多了一道柔软的影子，像我们肩膀靠近时的距离。"]
+  ]},
+  {chapter:"澪线 · 05　晚霞练习",bg:"rooftop",music:"daily",lines:[
+   ["我","澪说她想练习画晚霞，于是我们在放学后一起等日落。"],
+   ["我","天空先是金色，接着染上粉，最后在远处变成灰紫色。"],
+   ["月白澪","每次都一样，又每次都不太一样。","soft","right"],
+   ["我","就像我们每天在这里见面？"],
+   ["月白澪","你今天说的话，适合记在这一页。","shy","right"],
+   ["我","她把我的侧脸画进了日落里。我没有提醒她，那样看起来像一张合照。"]
+  ]},
+  {chapter:"澪线 · 05　晚霞练习",bg:"path",music:"daily",lines:[
+   ["我","下山时，澪的脚步比平常慢。她扶着栏杆停下来，轻轻吸了口气。"],
+   ["我","你累了吗？"],
+   ["月白澪","刚才爬楼梯有一点急。歇一会儿就好。","soft","right"],
+   ["我","我陪她在树下坐了一会儿。她把呼吸放缓，脸色也渐渐好起来。"],
+   ["月白澪","有你在旁边，时间就不会催我。","smile","right"],
+   ["我","我不知道她说的是今天的夕阳，还是其他更长的事情。"]
+  ]},
+  {chapter:"澪线 · 06　秋日小画展",bg:"festival",music:"daily",lines:[
+   ["我","澪报名参加了校园小画展。她画了一幅空荡荡的天台，角落里有两罐牛奶。"],
+   ["我","她没有画我们，却在墙边留了两个淡淡的影子。"],
+   ["月白澪","这样看，比较像真的有人坐过。","soft","right"],
+   ["我","有人问这是谁。"],
+   ["月白澪","是每天和我一起看日落的人。","shy","right"],
+   ["我","我在那张画前站了很久，像是想把自己也看进画里。"]
+  ]},
+  {chapter:"澪线 · 06　秋日小画展",bg:"library",music:"daily",lines:[
+   ["我","画展结束后，我们一起把作品收进纸箱。澪把最小的那幅递给我。"],
+   ["月白澪","这是你的。画的是上周四的云。"],
+   ["我","云的旁边还画了一个小小的人影。"],
+   ["月白澪","因为你那天说云像一只睡着的小猫。","smile","right"],
+   ["我","我把画夹进笔记本里。"],
+   ["我","从那天起，我也开始注意每天云的样子。"]
+  ]},
+  {chapter:"澪线 · 07　没问出口的事",bg:"infirmary",music:"daily",lines:[
+   ["我","校医室的午后很安静。澪坐在床边，喝了一口温水。"],
+   ["我","你最近总是很容易累。要不要去医院检查一下？"],
+   ["月白澪","我有按时复诊。只是最近画画太专心，忘记休息了。","soft","right"],
+   ["我","那我们每天少爬一层楼，慢一点走。"],
+   ["月白澪","好。你不要把我当成很脆弱的人。","smile","right"],
+   ["我","她说得认真。我答应了，也没有看见她把诊疗单收进包底。"]
+  ]},
+  {chapter:"澪线 · 07　没问出口的事",bg:"rooftop",music:"daily",lines:[
+   ["我","几天后，澪又回到天台。她照常画画，只是每隔一会儿就停下来休息。"],
+   ["月白澪","我小时候有一段时间，不能跑得太快。后来身体好些了，我就很珍惜能走到这里的每一天。","low","right"],
+   ["我","你现在也可以慢慢来。"],
+   ["月白澪","我知道。所以想把这片晚霞多看几次。","soft","right"],
+   ["我","她把画纸压好，朝我笑了一下。"],
+   ["我","那笑容很轻，却让我不知为什么想起了分别。","none"]
+  ]},
+  {chapter:"澪线 · 08　最后一张画",bg:"rooftop",music:"daily",lines:[
+   ["我","春天前，澪说想画一张完整的天台。她让我坐在旧长椅的一侧。"],
+   ["月白澪","这次不要看云，看看前面。","smile","right"],
+   ["我","那你呢？"],
+   ["月白澪","我会在画外面。这样才能画到你。","shy","right"],
+   ["我","我坐了很久，听着她的铅笔在纸上沙沙作响。"],
+   ["我","她偶尔抬头看我，像是在确认这幅画还没有走远。"]
+  ]},
+  {chapter:"澪线 · 08　最后一张画",bg:"path",music:"daily",lines:[
+   ["我","从天台下来时，澪把手放在胸口，缓了几步。"],
+   ["我","你要不要告诉老师？"],
+   ["月白澪","我今天就去复诊。真的没事。","soft","right"],
+   ["我","她答应我回家后给我发消息。晚上手机亮起来，是一张小小的晚霞照片。"],
+   ["月白澪","明天见。","soft","right"],
+   ["我","我回了“明天见”，不知道这句话很快会变得那么远。"]
+  ]},
+  {chapter:"澪线 · 09　空着的天台",bg:"class",music:"daily",lines:[
+   ["我","第二天，澪没有来学校。老师说她身体不舒服，请了几天假。"],
+   ["我","我给她发了消息。没有送达提示，也没有新的回复。"],
+   ["我","下课后，我独自爬上天台。速写本里那张画还夹在我的笔记本里。"],
+   ["我","天台空空的，夕阳照着她常坐的那块地砖。"],
+   ["我","我在这里等到天色暗下来。"],
+   ["我","第二天、第三天，我还是没有等到她。","none"]
+  ]},
+  {chapter:"澪线 · 09　空着的天台",bg:"hospital",music:"daily",lines:[
+   ["我","一周后，澪的班主任联系我，说她病情突然加重，正在医院住院治疗。"],
+   ["我","我去了医院。走廊很长，墙上挂着几幅淡色的风景画。"],
+   ["月白澪","对不起，我没能去学校。我本来想把那幅画画完。","low","right"],
+   ["我","她的声音很轻。我把带来的画纸放在床头。"],
+   ["月白澪","先不要看我。你告诉我，今天的云是什么形状？","soft","right"],
+   ["我","我看着窗外，说它像一只慢慢睡着的小猫。"]
+  ]},
+  {chapter:"澪线 · 10　窗边的颜色",bg:"hospital",music:"daily",lines:[
+   ["我","之后的日子里，我在放学后去医院陪她。我们画画、聊天，也有很多时候只是安静坐着。"],
+   ["月白澪","医生说我要休息很久。可能赶不上毕业典礼了。","soft","right"],
+   ["我","那我把那天的阳光画下来带给你。"],
+   ["月白澪","你画得可能不太像。","smile","right"],
+   ["我","那就多画几张，总会有一张能让你想起来。"],
+   ["月白澪","嗯。你答应我的，我会记住。","soft","right"]
+  ]},
+  {chapter:"澪线 · 10　窗边的颜色",bg:"hospital",music:"daily",lines:[
+   ["我","病房窗边有一盆小小的绿植。澪说它像一幅画里最不起眼的部分。"],
+   ["月白澪","可是没有它，画面会显得太空。"],
+   ["我","就像画外的那个人？"],
+   ["月白澪","对。你坐在那里，我看见窗外的时候，就知道今天有人陪我。","shy","right"],
+   ["我","她握了一下我的手，很快又松开。"],
+   ["我","我答应每天来。她说，只要身体允许，就再画一张画给我。"]
+  ]},
+  {chapter:"澪线 · 11　最后的晚霞",bg:"hospital",music:"farewell",lines:[
+   ["我","某个傍晚，澪的主治医生请我在门外等候。检查后，她暂时无法见我。"],
+   ["我","护士交给我一本速写本，说这是澪拜托她转交的。"],
+   ["我","我翻到最后一页。那是我们一起坐在天台长椅上的背影，夕阳铺满了整面天空。"],
+   ["我","纸页角落写着一行字：“谢谢你陪我看过最好的晚霞。”"],
+   ["我","我把速写本抱在怀里，在医院长椅上坐到窗外变暗。"],
+   ["我","那天之后，我再没有见到澪。","none"]
+  ]},
+  {chapter:"澪线 · 终章　速写本",bg:"rooftop",music:"farewell",lines:[
+   ["我","春天来时，学校天台边开了一朵很小的花。我把速写本带去，坐在澪常坐的位置。"],
+   ["我","翻过最后一页，铅笔留下的光还是柔软的。她画里的两个人一直坐在那里，没有起身。"],
+   ["我","我把今天的晚霞也记了下来。颜色和她画的一样，暖得让人不舍得离开。"],
+   ["我","她没有回来，故事也没有等来重逢。"],
+   ["我","但每次抬头看天，我都会想起那个人曾经教我，怎样把一束光留下来。","none"]
+  ],ending:["澪线 · 最好的晚霞","有些告别没有声音。只留下一页画，替两个人记得那束光。"]}
+ ]
+};
+
+const endingMusic = { daily:{label:"♫ 秋日钢琴 · 日常",bpm:74,notes:[261.63,329.63,392,329.63,293.66,349.23,440,349.23]}, farewell:{label:"♫ 慢慢远去 · 离别",bpm:49,notes:[220,261.63,329.63,293.66,196,246.94,293.66,261.63]} };
+const svgUri = s => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(s);
+function sceneSvg(key) {
+  const palettes = {
+    class:["#f7d9c7","#d8e0ec","#e8bd8e"], corridor:["#f9dfc9","#dae7ef","#d1aa86"],
+    library:["#d8e3e6","#aeb8b8","#d1ad87"], playground:["#f6c8a6","#d7b5ac","#a4b6ae"],
+    path:["#f4c3a9","#d0c3cc","#c8a777"], rain:["#aebfce","#8796a9","#778a96"],
+    rooftop:["#f0bcae","#ccb8d0","#9b9cae"], gym:["#ead5bd","#c5b49d","#977a63"],
+    station:["#efc3b8","#abb9c7","#8d8c9c"], festival:["#f5c6aa","#cda8b8","#8f8091"],
+    winter:["#d8e0e9","#b6c5d2","#9c9aa5"], infirmary:["#e4e8e4","#c4d1cf","#9fb5b2"],
+    hospital:["#e3e8e7","#c0d0d1","#9daeb4"], graduation:["#f9d7cc","#c7b7cc","#d49d9b"]
+  };
+  const p=palettes[key]||palettes.class, rain=key==="rain", station=key==="station";
+  let extras="";
+  if(key==="class"||key==="corridor"||key==="library"||key==="infirmary"||key==="hospital"){
+    extras='<rect x="1030" y="165" width="360" height="310" rx="5" fill="#fff6df" opacity=".72"/><path d="M1210 165v310M1030 320h360" stroke="#aab3bd" stroke-width="13" opacity=".78"/><path d="M1050 185h140v118h-140zM1230 185h140v118h-140zM1050 340h140v115h-140zM1230 340h140v115h-140z" fill="'+p[0]+'" opacity=".55"/>';
+  }
+  if(key==="playground"||key==="festival"||key==="gym"){
+    extras='<path d="M0 650 Q450 610 930 655 T1600 635V900H0Z" fill="'+p[2]+'" opacity=".78"/><path d="M0 745 Q500 690 1600 732" fill="none" stroke="#fff4e8" stroke-width="12" opacity=".7"/><path d="M0 805 Q500 750 1600 792" fill="none" stroke="#fff4e8" stroke-width="10" opacity=".58"/>';
+  }
+  if(key==="rooftop"){
+    extras='<path d="M0 665H1600V900H0Z" fill="#898b9d" opacity=".62"/><path d="M105 665V470h45v195M1450 665V500h42v165" fill="#878895" opacity=".7"/><rect x="530" y="610" width="380" height="18" rx="8" fill="#e8c6b0" opacity=".8"/>';
+  }
+  if(key==="path"||key==="graduation"||key==="winter"){
+    extras='<path d="M0 570h420v205H0zM1160 530h440v250h-440z" fill="#85879b" opacity=".28"/><path d="M0 620h420M1160 590h440" stroke="#fff3dc" stroke-width="10" opacity=".45"/><path d="M580 900 Q770 680 990 900Z" fill="#f3dacb" opacity=".45"/>';
+  }
+  if(key==="rain") extras+='<g stroke="#e6f3ff" stroke-width="3" opacity=".5"><path d="M155 120l-45 105M380 30l-45 105M760 140l-45 105M985 45l-45 105M1280 115l-45 105M1490 20l-45 105M250 400l-45 105M600 360l-45 105M1120 400l-45 105M1450 360l-45 105"/></g><path d="M0 742H1600" stroke="#dbe4ec" stroke-width="8" opacity=".55"/>';
+  if(station) extras+='<rect x="0" y="660" width="1600" height="28" fill="#eee4d8" opacity=".75"/><path d="M0 790H1600" stroke="#fff5dc" stroke-width="12" opacity=".6"/><rect x="650" y="535" width="300" height="126" rx="10" fill="#e8edf1" opacity=".3"/>';
+  const sun = key==="winter" ? "#fff8dc" : "#fff1cf";
+  const trees = (key==="path"||key==="graduation"||key==="playground") ?
+    '<g opacity=".7"><path d="M170 635Q180 445 155 300M180 480l-110-105M170 530l115-145M1340 640q-15-220 20-355m-22 200-100-95m120 150 106-120" stroke="#746e83" stroke-width="16" fill="none"/><g fill="'+(key==="graduation"?"#edb8bd":"#d3a66f")+'"><circle cx="98" cy="385" r="76"/><circle cx="230" cy="350" r="95"/><circle cx="1250" cy="360" r="93"/><circle cx="1400" cy="350" r="82"/></g></g>' : "";
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="'+p[0]+'"/><stop offset=".67" stop-color="'+p[1]+'"/><stop offset="1" stop-color="'+p[2]+'"/></linearGradient><radialGradient id="glow"><stop stop-color="'+sun+'" stop-opacity=".95"/><stop offset="1" stop-color="'+sun+'" stop-opacity="0"/></radialGradient><linearGradient id="shade" x2="0" y2="1"><stop stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#4e506c" stop-opacity=".28"/></linearGradient></defs><rect width="1600" height="900" fill="url(#sky)"/><circle cx="1150" cy="300" r="310" fill="url(#glow)"/><g fill="#fff" opacity=".22"><ellipse cx="310" cy="210" rx="195" ry="32"/><ellipse cx="370" cy="196" rx="93" ry="38"/><ellipse cx="810" cy="250" rx="175" ry="25"/></g>'+trees+'<path d="M0 550Q350 520 720 565T1600 535V900H0Z" fill="#85879a" opacity=".36"/><path d="M0 615Q320 570 760 620T1600 590V900H0Z" fill="#6d7187" opacity=".25"/>'+extras+'<g opacity=".24" fill="#fff8e9"><circle cx="260" cy="635" r="3"/><circle cx="470" cy="710" r="3"/><circle cx="1030" cy="620" r="3"/><circle cx="1380" cy="740" r="3"/></g><rect width="1600" height="900" fill="url(#shade)"/></svg>';
+}
+function portraitSvg(name, mood) {
+  const c=characters[name], isRin=name==="星野凛", isMio=name==="月白澪";
+  const hair=c.color, bow=isRin?"#bc5266":(isMio?"#aa99c2":"#8392a9");
+  const eye=mood==="low"||mood==="tears"?"#4c5a6a":"#514b5b";
+  let hairBack, hairFront, accessories="";
+  if(isRin){
+    hairBack='<path d="M270 280Q210 308 222 470l-28 192q-5 58 45 48l64-171 270 7 74 164q56 32 66-27l-29-202q8-126-90-177Z" fill="'+hair+'"/><path d="M260 375Q145 400 150 500q10 95 110 101l45-138M640 370q110 42 95 145-17 83-99 89l-45-145" fill="'+hair+'"/>';
+    hairFront='<path d="M251 334Q230 193 399 181q189-2 214 153l-40 89-91-99-94 79-96-48-70 100Z" fill="'+hair+'"/><path d="M245 278q-39-73-95-67 54 8 55 73m418 8q35-72 92-59-53 9-53 72" fill="'+hair+'"/>';
+    accessories='<path d="M186 251q45-52 87 0-42 55-87 0m469 0q45-52 87 0-42 55-87 0" fill="#d77c91"/>';
+  } else if(isMio){
+    hairBack='<path d="M249 313Q219 208 340 170q183-41 267 93 47 77 8 270l-64 182-71-103-244 3-36 94-53-192q-34-131 18-204Z" fill="'+hair+'"/>';
+    hairFront='<path d="M240 326Q233 171 388 166q176 4 217 150l-54 8-78-87q-48 73-154 76l-70 89Z" fill="'+hair+'"/><path d="M275 250q-43 158-14 263M602 252q56 157 4 279" stroke="#817c89" stroke-width="9" fill="none" opacity=".45"/>';
+  } else {
+    hairBack='<path d="M231 324Q217 196 372 169q196-8 250 137 33 94 8 262l-55 171-84-113-220 1-68 107-45-178q-38-141 73-232Z" fill="'+hair+'"/>';
+    hairFront='<path d="M228 313Q205 173 376 161q184-6 239 151l-45 61-60-95q-45 97-174 94l-75 78-49-27Z" fill="'+hair+'"/><path d="M258 252q-27 215 17 362m309-341q34 147-8 285" stroke="#55596c" stroke-width="8" fill="none" opacity=".4"/>';
+  }
+  let mouth;
+  if(mood==="tears") mouth='<path d="M373 510q26-18 53 0" fill="none" stroke="#ad6e76" stroke-width="7" stroke-linecap="round"/><path d="M295 421q-14 49 4 61 18-4 12-56m179-4q-13 46 5 59 16-5 11-53" fill="#a9d1df" opacity=".8"/>';
+  else if(mood==="low") mouth='<path d="M378 519q20-9 42 0" fill="none" stroke="#986c77" stroke-width="6" stroke-linecap="round"/>';
+  else if(mood==="shy") mouth='<path d="M370 507q25 20 51 0" fill="none" stroke="#a86672" stroke-width="7" stroke-linecap="round"/><ellipse cx="298" cy="465" rx="33" ry="12" fill="#eaa5a2" opacity=".38"/><ellipse cx="491" cy="465" rx="33" ry="12" fill="#eaa5a2" opacity=".38"/>';
+  else mouth='<path d="M368 505q27 34 57 0" fill="none" stroke="#a86672" stroke-width="8" stroke-linecap="round"/>';
+  if(isRin) accessories+='<path d="M393 603l-50 49 51 42 48-42Z" fill="'+bow+'"/><path d="M391 616l-95 52 74 16 26-54m8 0 88 51-68 16-26-54" fill="'+bow+'"/>';
+  if(isMio) accessories+='<path d="M426 610l-38 52 39 33 39-36Z" fill="'+bow+'"/>';
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1200"><defs><linearGradient id="shirt" x2="0" y2="1"><stop stop-color="#fffdf8"/><stop offset="1" stop-color="#dfe3eb"/></linearGradient><linearGradient id="jacket" x2="0" y2="1"><stop stop-color="'+(isMio?"#e6dfec":"#33415d")+'"/><stop offset="1" stop-color="'+(isMio?"#c9c4d6":"#202a40")+'"/></linearGradient><radialGradient id="skin"><stop stop-color="#ffe4d7"/><stop offset="1" stop-color="#edbda9"/></radialGradient></defs><ellipse cx="415" cy="1130" rx="260" ry="34" fill="#343852" opacity=".13"/><path d="M206 1200q-8-220 63-351 50-86 145-91 113 6 166 105 61 118 66 337Z" fill="url(#jacket)"/><path d="m330 763 83 104 93-108 53 76-72 177-158-2-62-170Z" fill="url(#shirt)"/><path d="M371 727h94v122q-45 60-91 0Z" fill="url(#skin)"/>'+hairBack+'<path d="M265 355q3-148 154-157 155 1 169 163v122q-3 154-175 182-161-36-163-188Z" fill="url(#skin)"/><path d="M276 409q51-30 102 0m75 0q48-30 97 0" fill="none" stroke="#986f72" stroke-width="7" stroke-linecap="round" opacity=".7"/><ellipse cx="326" cy="443" rx="19" ry="31" fill="'+eye+'"/><ellipse cx="507" cy="443" rx="19" ry="31" fill="'+eye+'"/><ellipse cx="332" cy="432" rx="6" ry="9" fill="#fff"/><ellipse cx="513" cy="432" rx="6" ry="9" fill="#fff"/><path d="M404 453q-22 45-4 48" fill="none" stroke="#c58c80" stroke-width="6" stroke-linecap="round"/>'+mouth+'<path d="M339 623q76 39 151-2l-12 69q-63 46-127 0Z" fill="#fffaf4" opacity=".9"/><path d="M351 628q64 29 127-2" fill="none" stroke="'+(isMio?"#aa9bbc":"#65748c")+'" stroke-width="8"/>'+hairFront+accessories+'<path d="M239 1200q18-147 89-220l69 113-32 107m331 0q-12-145-85-220l-71 113 35 107" fill="url(#jacket)"/><path d="M410 870v252m18-254v254" stroke="#fff" stroke-width="8" opacity=".25"/><path d="M265 910q-57 117-50 247m382-250q72 105 77 250" fill="none" stroke="#fff" stroke-width="5" opacity=".13"/></svg>';
+}
+
+const game={stream:common,index:0,route:"common",typing:false,timer:null,shown:"",log:[],musicOn:true,voiceOn:true,typingSpeed:31,toastTimer:null,currentScene:null,lastWho:"",lastSighAt:0,lastReactAt:0};
+const $=id=>document.getElementById(id);
+const textEl=$("text"), portrait=$("portrait"), portraitStage=$("portrait-stage"), nameplate=$("nameplate"), chapter=$("chapter");
+// 坐标以 1024×1536 的原始立绘为准；SVG 与 object-fit:contain 使用同一对齐方式。
+const faceGeometry={
+  "森川汐":{cheeks:[[414,412],[624,422]],tears:[[402,398],[645,405]],mouth:[525,465],heart:[706,360]},
+  "星野凛":{cheeks:[[399,479],[627,440]],tears:[[390,464],[640,419]],mouth:[548,528],heart:[715,373]},
+  "月白澪":{cheeks:[[434,422],[577,384]],tears:[[421,405],[590,370]],mouth:[534,448],heart:[656,331]}
+};
+function positionFaceEffects(who){
+  const face=faceGeometry[who];if(!face)return;
+  [["cheek-left",face.cheeks[0]],["cheek-right",face.cheeks[1]],["tear-left",face.tears[0]],["tear-right",face.tears[1]]].forEach(([id,[x,y]])=>{$(id).setAttribute("cx",x);$(id).setAttribute("cy",y);});
+  $("face-breath-anchor").setAttribute("transform",`translate(${face.mouth[0]} ${face.mouth[1]})`);
+  $("face-hearts-anchor").setAttribute("transform",`translate(${face.heart[0]} ${face.heart[1]})`);
+}
+function lineItem(){return game.stream[game.index];}
+function updateProgress(){
+  $("progress").style.width=(game.stream.length<2?0:(game.index/(game.stream.length-1))*100)+"%";
+}
+function setScene(item){
+  const bgKey=item.bg||"class", bg=backgroundInfo[bgKey]||backgroundInfo.class;
+  const img=$("backdrop");
+  img.dataset.scene=bgKey;
+  $("wash").dataset.scene=bgKey;
+  img.style.opacity="0.25";
+  window.setTimeout(()=>{
+    img.onerror=()=>{img.onerror=null;img.src=svgUri(sceneSvg(bgKey));};
+    img.src=backgroundAssets[bgKey]||backgroundAssets.class;img.alt=bg[1];img.style.opacity="1";
+  },180);
+  setAmbience(bgKey);
+  $("scene-label").textContent=bg[1];
+  const mode=item.music==="farewell"?"farewell":"daily";
+  $("bgm-label").textContent=endingMusic[mode].label;
+  if(game.musicOn) music.change(mode);
+  if(item.chapter && chapter.textContent!==item.chapter){
+    chapter.textContent=item.chapter; chapter.classList.add("show");
+    window.clearTimeout(game.chapterTimer);
+    game.chapterTimer=window.setTimeout(()=>chapter.classList.remove("show"),2600);
+  }
+}
+function setAmbience(scene){
+  const kind=scene==="rain"?"rain":scene==="graduation"?"petals":(scene==="hospital"||scene==="infirmary"||scene==="festival"||scene==="winter"?"glow":"leaves");
+  $("ambience").className=kind;
+  fxEngine.setScene(kind);
+}
+// 画布粒子带有风力、重力、转动惯性和落地反弹；触碰角色时发出一簇纸片花瓣。
+const fxEngine=(()=>{
+  const canvas=$("fx-canvas"), ctx=canvas.getContext("2d"), stage=$("portrait-stage");
+  const state={w:0,h:0,dpr:1,kind:"leaves",particles:[],bursts:[],last:0,wind:0,windTarget:0,mx:0,my:0,vx:0,vy:0,targetX:0,targetY:0,raf:0};
+  const reduced=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function resize(){
+    const box=$("game").getBoundingClientRect();state.w=box.width;state.h=box.height;state.dpr=Math.min(window.devicePixelRatio||1,1.5);
+    canvas.width=Math.round(state.w*state.dpr);canvas.height=Math.round(state.h*state.dpr);
+    ctx.setTransform(state.dpr,0,0,state.dpr,0,0);
+    if(state.particles.length===0)setScene(state.kind);
+  }
+  function particle(initial=false){
+    const rain=state.kind==="rain",glow=state.kind==="glow";
+    return {x:Math.random()*state.w,y:initial?Math.random()*state.h:-24-Math.random()*80,
+      size:rain?1+Math.random()*1.1:glow?2+Math.random()*4:6+Math.random()*8,
+      vx:(Math.random()-.5)*(rain?24:32),vy:rain?470+Math.random()*380:glow?-14-Math.random()*15:Math.random()*20,
+      angle:Math.random()*Math.PI*2,spin:(Math.random()-.5)*2.2,alpha:.23+Math.random()*.42,
+      gravity:glow?-2:rain?28:19+Math.random()*15,bounces:0,phase:Math.random()*6.28};
+  }
+  function setScene(kind){
+    state.kind=kind;const count=reduced?5:kind==="rain"?(state.w<700?22:42):(kind==="glow"?14:state.w<700?12:21);
+    state.particles=Array.from({length:count},()=>particle(true));
+  }
+  function burst(x,y,color){
+    for(let i=0;i<(state.w<700?9:14);i++){
+      const angle=(Math.PI*2*i/14)+(Math.random()-.5)*.5,speed=70+Math.random()*150;
+      state.bursts.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed-45,life:.75+Math.random()*.4,age:0,size:3+Math.random()*5,spin:(Math.random()-.5)*8,angle:Math.random()*6.28,color});
+    }
+  }
+  function draw(now){
+    state.raf=requestAnimationFrame(draw);
+    const dt=state.last?Math.min((now-state.last)/1000,.034):.016;state.last=now;
+    ctx.clearRect(0,0,state.w,state.h);
+    state.windTarget=Math.sin(now*.00019)*25+Math.sin(now*.00047)*9;
+    state.wind+=(state.windTarget-state.wind)*Math.min(1,dt*.7);
+    state.vx+=((state.targetX-state.mx)*38-state.vx*11)*dt;state.vy+=((state.targetY-state.my)*38-state.vy*11)*dt;
+    state.mx+=state.vx*dt;state.my+=state.vy*dt;
+    stage.style.setProperty("--physics-x",state.mx.toFixed(2)+"px");stage.style.setProperty("--physics-y",state.my.toFixed(2)+"px");
+    stage.style.setProperty("--physics-tilt",(state.mx*.09).toFixed(2)+"deg");
+    const floor=state.h*.94;
+    for(const p of state.particles){
+      p.phase+=dt;p.vx+=state.wind*dt*(state.kind==="rain" ? .12 : .42);p.vy+=p.gravity*dt;
+      p.x+=p.vx*dt;p.y+=p.vy*dt;p.angle+=p.spin*dt;
+      if(p.x<-30)p.x=state.w+20;if(p.x>state.w+30)p.x=-20;
+      if(p.y>floor){
+        p.y=floor;
+        if(state.kind!=="rain"&&p.bounces===0){p.vy*=-.28;p.vx*=.72;p.bounces++;}
+        else Object.assign(p,particle(false));
+      }
+      if(p.y<-50)p.y=state.h+10;
+      if(state.kind==="rain"){
+        ctx.strokeStyle=`rgba(231,241,249,${p.alpha*.72})`;ctx.lineWidth=p.size;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-state.wind*.05,p.y+25+p.size*5);ctx.stroke();
+      }else if(state.kind==="glow"){
+        const a=p.alpha*(.6+.4*Math.sin(p.phase));const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.size*4);
+        g.addColorStop(0,`rgba(255,245,216,${a})`);g.addColorStop(1,"rgba(255,245,216,0)");ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,p.size*4,0,Math.PI*2);ctx.fill();
+      }else{
+        ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.angle);ctx.globalAlpha=p.alpha*(.78+.22*Math.sin(p.phase));
+        const c=state.kind==="petals"?"#e9a4b3":"#d9a969";ctx.fillStyle=c;ctx.beginPath();ctx.ellipse(0,0,p.size*.56,p.size,0,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle=state.kind==="petals"?"#fff0f3":"#f7d495";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,-p.size*.65);ctx.lineTo(0,p.size*.72);ctx.stroke();ctx.restore();
+      }
+    }
+    for(let i=state.bursts.length-1;i>=0;i--){
+      const p=state.bursts[i];p.age+=dt;p.vy+=330*dt;p.vx*=Math.pow(.985,dt*60);p.x+=p.vx*dt;p.y+=p.vy*dt;p.angle+=p.spin*dt;
+      if(p.age>=p.life){state.bursts.splice(i,1);continue;}
+      ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.angle);ctx.globalAlpha=1-p.age/p.life;ctx.fillStyle=p.color;
+      ctx.beginPath();ctx.ellipse(0,0,p.size*.55,p.size,0,0,Math.PI*2);ctx.fill();ctx.restore();
+    }
+  }
+  window.addEventListener("resize",resize,{passive:true});
+  window.addEventListener("pointermove",event=>{
+    const r=$("game").getBoundingClientRect();state.targetX=((event.clientX-r.left)/r.width-.5)*11;state.targetY=((event.clientY-r.top)/r.height-.5)*7;
+  },{passive:true});
+  window.addEventListener("pointerout",event=>{if(!event.relatedTarget){state.targetX=0;state.targetY=0;}},{passive:true});
+  resize();state.raf=requestAnimationFrame(draw);
+  return {setScene,burst};
+})();
+function resetLineIndexes(stream){
+  stream.forEach(scene=>{if(scene._line!==undefined)delete scene._line;});
+}
+function showLine(){
+  window.clearInterval(game.timer);
+  game.typing=false;
+  const item=lineItem();
+  if(!item){finish();return;}
+  updateProgress();
+  if(item.type==="choice"){showChoices(item);return;}
+  if(game.currentScene!==item){setScene(item);game.currentScene=item;}
+  const [who,content,mood="soft",side="right"]=item.lines[item._line||0];
+  $("speaker").textContent=who==="我"?"":who;
+  nameplate.textContent=who==="我"?"":who;
+  nameplate.classList.toggle("visible",who!=="我");
+  if(characters[who]){
+    positionFaceEffects(who);
+    portrait.onerror=()=>{portrait.onerror=null;portrait.src=svgUri(portraitSvg(who,mood));};
+    if(portrait.dataset.character!==who){portrait.dataset.character=who;portrait.src=characters[who].file;}
+    portrait.alt=characters[who].description;
+    portrait.className="visible "+mood;
+    const entering=game.lastWho!==who;
+    portraitStage.className=side+" visible "+mood+" "+(entering?"enter ":"");
+    if(entering){window.clearTimeout(game.portraitTimer);game.portraitTimer=window.setTimeout(()=>portraitStage.classList.remove("enter"),760);}
+    portraitStage.classList.add("speaking");
+    game.lastWho=who;
+    characterAudio.onLine(mood);
+  } else { portraitStage.className="";portrait.className="";portrait.alt="";portrait.dataset.character="";game.lastWho=""; }
+  $("dialogue").setAttribute("aria-label",(who==="我"?"旁白":who)+"："+content);
+  game.shown=content;
+  textEl.textContent="";
+  let i=0;
+  game.typing=true;
+  game.timer=window.setInterval(()=>{
+    i++;
+    textEl.textContent=content.slice(0,i);
+    if(i>=content.length){window.clearInterval(game.timer);game.typing=false;portraitStage.classList.remove("speaking");}
+  },Math.max(10,60-game.typingSpeed-(content.length>45?6:0)));
+  game.log.push({who,content});
+  if(game.log.length>250)game.log.shift();
+  updateLog();
+}
+function advance(){
+  if($("start-screen").classList.contains("hidden")===false)return;
+  if($("log-panel").classList.contains("visible"))return;
+  if($("endcard").classList.contains("visible"))return;
+  if($("choices").classList.contains("visible"))return;
+  if(game.typing){window.clearInterval(game.timer);textEl.textContent=game.shown;game.typing=false;portraitStage.classList.remove("speaking");return;}
+  const item=lineItem();
+  if(item && item.type==="choice"){showChoices(item);return;}
+  if(item && item.lines && (item._line||0)<item.lines.length-1){
+    item._line=(item._line||0)+1;showLine();return;
+  }
+  game.index++;
+  if(game.index>=game.stream.length){finish();return;}
+  showLine();
+}
+function showChoices(item){
+  $("speaker").textContent="";nameplate.classList.remove("visible");portraitStage.className="";portrait.className="";game.lastWho="";
+  $("scene-label").textContent="故事的下一页，由你来选";
+  $("text").textContent=item.question;
+  const host=$("choices");host.innerHTML='<div class="choice-title">'+item.question+'</div>';
+  item.options.forEach(option=>{
+    const b=document.createElement("button");b.className="choice";b.textContent=option.label;
+    b.addEventListener("click",event=>{
+      event.stopPropagation();
+      game.route=option.route;game.stream=routes[option.route];resetLineIndexes(game.stream);game.index=0;game.log=[];game.currentScene=null;
+      host.classList.remove("visible");showLine();
+      toast("进入个人线 · 这段记忆只属于你们");
+    });
+    host.appendChild(b);
+  });
+  host.classList.add("visible");
+}
+function finish(){
+  window.clearInterval(game.timer);
+  const ending=routes[game.route]&&routes[game.route].find(s=>s.ending);
+  if(!ending){$("end-title").textContent="故事暂时停在这里";$("end-copy").textContent="谢谢你读到这里。";}else{
+    $("end-title").textContent=ending.ending[0];$("end-copy").textContent=ending.ending[1];
+  }
+  music.change("farewell");$("bgm-label").textContent=endingMusic.farewell.label;
+  $("endcard").classList.add("visible");
+}
+function start(){
+  $("game").classList.add("playing");
+  $("start-screen").classList.add("hidden");
+  game.stream=common;resetLineIndexes(common);game.route="common";game.index=0;game.log=[];game.currentScene=null;music.ensure();characterAudio.prepare();
+  showLine();
+}
+function replay(){
+  $("game").classList.add("playing");
+  $("endcard").classList.remove("visible");$("choices").classList.remove("visible");
+  game.stream=common;resetLineIndexes(common);game.route="common";game.index=0;game.log=[];game.currentScene=null;showLine();music.ensure();
+}
+function updateLog(){
+  const host=$("log-list");host.innerHTML="";
+  game.log.slice().reverse().forEach(entry=>{
+    const row=document.createElement("div");row.className="log-item";
+    const who=document.createElement("b");who.textContent=entry.who==="我"?"旁白":entry.who;
+    const body=document.createElement("div");body.className="inner";body.textContent=entry.content;
+    row.append(who,body);host.appendChild(row);
+  });
+}
+function toast(message){
+  const el=$("toast");el.textContent=message;el.classList.add("visible");
+  window.clearTimeout(game.toastTimer);game.toastTimer=window.setTimeout(()=>el.classList.remove("visible"),1700);
+}
+function showMenuView(viewId){
+  document.querySelectorAll(".menu-view").forEach(view=>view.classList.toggle("active",view.id===viewId));
+}
+function requestLandscape(){
+  if(!window.matchMedia("(max-width: 960px)").matches||!screen.orientation||!screen.orientation.lock)return;
+  try{const result=screen.orientation.lock("landscape");if(result&&result.catch)result.catch(()=>{});}catch(error){/* 不支持锁定时由旋转提示引导 */}
+}
+
+// 使用 Web Audio 合成无外部依赖的轻柔钢琴音型；首次播放需由用户点击启动。
+const music={
+  ctx:null,mode:"daily",step:0,timer:null,
+  ensure(){
+    if(!game.musicOn)return;
+    if(!this.ctx){
+      const AC=window.AudioContext||window.webkitAudioContext;
+      if(!AC)return;
+      this.ctx=new AC();
+    }
+    if(this.ctx.state==="suspended")this.ctx.resume();
+    if(!this.timer)this.start();
+  },
+  start(){
+    if(!this.ctx)return;
+    window.clearInterval(this.timer);
+    const bpm=endingMusic[this.mode].bpm, interval=60000/bpm;
+    this.timer=window.setInterval(()=>this.note(),interval);
+    this.note();
+  },
+  note(){
+    if(!this.ctx||!game.musicOn)return;
+    const data=endingMusic[this.mode], f=data.notes[this.step%data.notes.length], now=this.ctx.currentTime;
+    const gain=this.ctx.createGain(), osc=this.ctx.createOscillator(), overtone=this.ctx.createOscillator(), og=this.ctx.createGain();
+    gain.gain.setValueAtTime(.0001,now);gain.gain.exponentialRampToValueAtTime(.055,now+.018);gain.gain.exponentialRampToValueAtTime(.0001,now+2.1);
+    osc.type="sine";osc.frequency.setValueAtTime(f,now);
+    overtone.type="triangle";overtone.frequency.setValueAtTime(f*2,now);og.gain.value=.16;
+    osc.connect(gain);overtone.connect(og);og.connect(gain);gain.connect(this.ctx.destination);
+    osc.start(now);overtone.start(now);osc.stop(now+2.2);overtone.stop(now+2.2);
+    this.step++;
+  },
+  change(mode){
+    if(this.mode===mode)return;
+    this.mode=mode;this.step=0;
+    if(this.ctx&&game.musicOn)this.start();
+  },
+  toggle(){
+    game.musicOn=!game.musicOn;
+    const button=$("music-button");
+    button.classList.toggle("active",game.musicOn);
+    button.textContent=game.musicOn?"♫":"♪";
+    button.title=game.musicOn?"关闭音乐":"播放音乐";
+    button.setAttribute("aria-label",button.title);
+    if($("setting-music"))$("setting-music").checked=game.musicOn;
+    if(game.musicOn){this.ensure();toast("音乐已开启");}
+    else{window.clearInterval(this.timer);this.timer=null;toast("音乐已关闭");}
+  }
+};
+
+// 优先播放随游戏附带的叹气音频；Web Audio 保留为浏览器不支持音频文件时的回退。
+const characterAudio={
+  noiseBuffer:null,lastSigh:0,clips:{},
+  prepare(){
+    const files={"森川汐":"assets/audio/sigh-shio.wav","星野凛":"assets/audio/sigh-rin.wav","月白澪":"assets/audio/sigh-mio.wav"};
+    for(const [who,file] of Object.entries(files)){
+      if(this.clips[who])continue;
+      const clip=document.createElement("audio");clip.src=file;clip.preload="auto";clip.volume=.8;this.clips[who]=clip;
+    }
+  },
+  context(){
+    if(!music.ctx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;music.ctx=new AC();}
+    if(music.ctx.state==="suspended")music.ctx.resume().catch(()=>{});
+    return music.ctx;
+  },
+  onLine(mood){
+    if(mood==="low"||mood==="tears")this.sigh();
+  },
+  sigh(){
+    const stamp=Date.now();if(stamp-this.lastSigh<2800)return;this.lastSigh=stamp;
+    portraitStage.classList.remove("exhaling");void portraitStage.offsetWidth;portraitStage.classList.add("exhaling");
+    window.clearTimeout(game.exhaleTimer);game.exhaleTimer=window.setTimeout(()=>portraitStage.classList.remove("exhaling"),1500);
+    if(!game.voiceOn)return;
+    this.prepare();
+    const clip=this.clips[game.lastWho];
+    if(clip){
+      try{clip.currentTime=0;const playback=clip.play();if(playback&&playback.catch)playback.catch(()=>this.synthSigh());return;}
+      catch(error){/* 音频文件不可用时使用下方合成音 */}
+    }
+    this.synthSigh();
+  },
+  synthSigh(){
+    const ctx=this.context();if(!ctx)return;
+    if(!this.noiseBuffer){
+      this.noiseBuffer=ctx.createBuffer(1,Math.round(ctx.sampleRate*2),ctx.sampleRate);
+      const samples=this.noiseBuffer.getChannelData(0);for(let i=0;i<samples.length;i++)samples[i]=Math.random()*2-1;
+    }
+    const now=ctx.currentTime,source=ctx.createBufferSource(),high=ctx.createBiquadFilter(),low=ctx.createBiquadFilter(),gain=ctx.createGain();
+    source.buffer=this.noiseBuffer;high.type="highpass";high.frequency.value=185;low.type="lowpass";low.frequency.setValueAtTime(1450,now);low.frequency.exponentialRampToValueAtTime(690,now+1.15);
+    gain.gain.setValueAtTime(.0001,now);gain.gain.exponentialRampToValueAtTime(.14,now+.23);gain.gain.setValueAtTime(.10,now+.55);gain.gain.exponentialRampToValueAtTime(.0001,now+1.24);
+    source.connect(high);high.connect(low);low.connect(gain);gain.connect(ctx.destination);source.start(now);source.stop(now+1.27);
+    const base={"森川汐":205,"星野凛":245,"月白澪":215}[game.lastWho]||215;
+    const tone=ctx.createOscillator(),toneGain=ctx.createGain();tone.type="triangle";tone.frequency.setValueAtTime(base,now);tone.frequency.exponentialRampToValueAtTime(base*.68,now+1.2);
+    toneGain.gain.setValueAtTime(.0001,now);toneGain.gain.exponentialRampToValueAtTime(.014,now+.15);toneGain.gain.exponentialRampToValueAtTime(.0001,now+1.18);
+    tone.connect(toneGain);toneGain.connect(ctx.destination);tone.start(now);tone.stop(now+1.25);
+  }
+};
+const characterReactions={
+  "森川汐":"汐把书页挡住半张脸，耳尖悄悄红了。",
+  "星野凛":"凛晃了晃双马尾，把一颗橘子糖塞进你手心。",
+  "月白澪":"澪在速写本边角添了一朵小小的云。"
+};
+portrait.addEventListener("click",event=>{
+  event.stopPropagation();const who=game.lastWho;if(!who||!characters[who])return;
+  const now=Date.now();if(now-game.lastReactAt<850)return;game.lastReactAt=now;
+  portraitStage.classList.remove("reacting");void portrait.offsetWidth;portraitStage.classList.add("reacting");
+  window.setTimeout(()=>portraitStage.classList.remove("reacting"),560);
+  if(!portraitStage.classList.contains("low")&&!portraitStage.classList.contains("tears")){
+    portraitStage.classList.add("blush-extra");window.clearTimeout(game.blushTimer);
+    game.blushTimer=window.setTimeout(()=>portraitStage.classList.remove("blush-extra"),2100);
+  }
+  const r=portrait.getBoundingClientRect(),g=$("game").getBoundingClientRect();fxEngine.burst(r.left+r.width*.5-g.left,r.top+r.height*.33-g.top,characters[who].accent);
+  characterAudio.sigh();toast(characterReactions[who]);
+});
+
+// 首屏随机呈现秋日教室；点击文字可跳过当前打字机段，再点一次推进剧情。
+$("backdrop").onerror=()=>{$("backdrop").onerror=null;$("backdrop").src=svgUri(sceneSvg("class"));};
+$("backdrop").src=backgroundAssets.class;
+$("backdrop").alt=backgroundInfo.class[1];
+$("start-button").addEventListener("click",event=>{event.stopPropagation();requestLandscape();start();});
+$("about-button").addEventListener("click",event=>{event.stopPropagation();showMenuView("about-view");});
+$("settings-button").addEventListener("click",event=>{event.stopPropagation();showMenuView("settings-view");});
+document.querySelectorAll("[data-menu-back]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();showMenuView("menu-home");}));
+$("setting-music").addEventListener("change",event=>{if(event.currentTarget.checked!==game.musicOn)music.toggle();});
+$("setting-voice").addEventListener("change",event=>{
+  game.voiceOn=event.currentTarget.checked;const button=$("voice-button");button.classList.toggle("active",game.voiceOn);
+  button.textContent=game.voiceOn?"〰":"⊘";button.title=game.voiceOn?"关闭角色叹气音效":"开启角色叹气音效";button.setAttribute("aria-label",button.title);
+});
+$("setting-speed").addEventListener("input",event=>{
+  game.typingSpeed=Number(event.currentTarget.value);const speed=game.typingSpeed;
+  $("setting-speed-label").textContent=(speed<24?"偏慢":speed>41?"偏快":"标准")+" · "+speed;
+});
+$("dialogue").addEventListener("click",advance);
+$("game").addEventListener("click",event=>{
+  if(event.target.closest("button")||event.target.closest(".log-panel")||event.target.closest(".dialogue")||event.target.closest("#portrait-stage"))return;
+  advance();
+});
+$("music-button").addEventListener("click",event=>{event.stopPropagation();music.toggle();});
+$("voice-button").addEventListener("click",event=>{
+  event.stopPropagation();game.voiceOn=!game.voiceOn;const button=$("voice-button");
+  button.classList.toggle("active",game.voiceOn);button.textContent=game.voiceOn?"〰":"⊘";
+  button.title=game.voiceOn?"关闭角色叹气音效":"开启角色叹气音效";button.setAttribute("aria-label",button.title);$("setting-voice").checked=game.voiceOn;toast(game.voiceOn?"角色叹气音效已开启":"角色叹气音效已关闭");
+});
+$("log-button").addEventListener("click",event=>{event.stopPropagation();updateLog();$("log-panel").classList.add("visible");});
+$("log-close").addEventListener("click",()=>$("log-panel").classList.remove("visible"));
+$("replay-button").addEventListener("click",event=>{event.stopPropagation();replay();});
+document.addEventListener("keydown",event=>{
+  if(event.key==="Escape"){
+    if(!$("start-screen").classList.contains("hidden")&&!$("menu-home").classList.contains("active")){showMenuView("menu-home");return;}
+    $("log-panel").classList.remove("visible");return;
+  }
+  if(event.key===" "||event.key==="ArrowRight"||event.key==="Enter"){event.preventDefault();advance();}
+});
+</script>
+</body>
+</html>
