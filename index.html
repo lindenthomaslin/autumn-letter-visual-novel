@@ -240,7 +240,6 @@
     .toast { position: absolute; z-index: 14; left: 50%; top: 70px; transform: translate(-50%,-8px); opacity: 0; pointer-events: none; padding: 8px 15px; border-radius: 18px; color: #fff; background: #4a4a608c; backdrop-filter: blur(8px); font-size: 11px; transition: .25s; }
     .toast.visible { transform: translate(-50%,0); opacity: 1; }
     .mobile-hint { display:none; }
-    .orientation-guide { display:none; }
     @media (max-width: 700px) {
       .topbar { top: max(11px,env(safe-area-inset-top)); padding: 0 14px; }
       .brand { font-size: 10px; gap: 7px; }
@@ -310,26 +309,6 @@
       .menu-secondary { padding:9px 14px; }
       .menu-credit { margin-top:11px; }
       .start-note { margin-top:9px; }
-      .orientation-guide { display:none !important; }
-    }
-    @media (max-width: 960px) and (orientation: portrait) {
-      .orientation-guide {
-        position:fixed; z-index:100; inset:0; display:grid; place-items:center; padding:28px;
-        color:#4b4e61; text-align:center;
-        background:radial-gradient(ellipse at 50% 34%,rgba(255,255,255,.96),rgba(244,237,239,.97) 58%,rgba(222,222,235,.99));
-      }
-      .orientation-inner { width:min(330px,100%); }
-      .orientation-phone {
-        width:68px; height:112px; margin:0 auto 26px; position:relative;
-        border:3px solid #b97989; border-radius:15px; box-shadow:0 10px 26px #8b6d7b24;
-        animation:rotate-phone 2.2s ease-in-out infinite;
-      }
-      .orientation-phone::before { content:""; position:absolute; width:18px; height:3px; border-radius:3px; background:#d3a0aa; left:50%; bottom:7px; transform:translateX(-50%); }
-      .orientation-phone::after { content:"✿"; position:absolute; left:50%; top:50%; color:#c78c9a; font-size:23px; transform:translate(-50%,-50%); }
-      @keyframes rotate-phone { 0%,18% { transform:rotate(0); } 55%,80% { transform:rotate(90deg); } 100% { transform:rotate(90deg); } }
-      .orientation-title { margin:0 0 10px; font:500 22px/1.5 "STSong","Songti SC",serif; letter-spacing:.12em; }
-      .orientation-copy { margin:0; color:#838493; font-size:13px; line-height:1.9; }
-      .orientation-credit { margin-top:24px; color:#a77b88; font-size:10px; letter-spacing:.19em; }
     }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
@@ -338,14 +317,6 @@
 </head>
 <body>
 <main id="game" aria-label="晚风借我一封信，视觉小说">
-  <section class="orientation-guide" role="status" aria-live="polite">
-    <div class="orientation-inner">
-      <div class="orientation-phone" aria-hidden="true"></div>
-      <h1 class="orientation-title">请将手机横过来</h1>
-      <p class="orientation-copy">故事将在横屏中展开。<br>旋转手机后，就能继续这段秋日来信。</p>
-      <div class="orientation-credit">THOMAS 制作出品</div>
-    </div>
-  </section>
   <img id="backdrop" alt="">
   <div id="wash"></div>
   <div id="ambience" class="leaves" aria-hidden="true"><canvas id="fx-canvas"></canvas></div>
@@ -1403,10 +1374,12 @@ function toast(message){
 function showMenuView(viewId){
   document.querySelectorAll(".menu-view").forEach(view=>view.classList.toggle("active",view.id===viewId));
 }
-function requestLandscape(){
-  if(!window.matchMedia("(max-width: 960px)").matches||!screen.orientation||!screen.orientation.lock)return;
-  try{const result=screen.orientation.lock("landscape");if(result&&result.catch)result.catch(()=>{});}catch(error){/* 不支持锁定时由旋转提示引导 */}
+function hideWechatToolbar(){
+  const hide=()=>{try{if(window.WeixinJSBridge&&typeof window.WeixinJSBridge.call==="function")window.WeixinJSBridge.call("hideToolbar");}catch(error){/* 普通浏览器无微信工具栏可隐藏 */}};
+  if(window.WeixinJSBridge)hide();
+  else document.addEventListener("WeixinJSBridgeReady",hide,{once:true});
 }
+hideWechatToolbar();
 
 // 使用 Web Audio 合成无外部依赖的轻柔钢琴音型；首次播放需由用户点击启动。
 const music={
@@ -1526,7 +1499,7 @@ portrait.addEventListener("click",event=>{
 $("backdrop").onerror=()=>{$("backdrop").onerror=null;$("backdrop").src=svgUri(sceneSvg("class"));};
 $("backdrop").src=backgroundAssets.class;
 $("backdrop").alt=backgroundInfo.class[1];
-$("start-button").addEventListener("click",event=>{event.stopPropagation();requestLandscape();start();});
+$("start-button").addEventListener("click",event=>{event.stopPropagation();start();});
 $("about-button").addEventListener("click",event=>{event.stopPropagation();showMenuView("about-view");});
 $("settings-button").addEventListener("click",event=>{event.stopPropagation();showMenuView("settings-view");});
 document.querySelectorAll("[data-menu-back]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();showMenuView("menu-home");}));
